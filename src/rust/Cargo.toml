@@ -1,0 +1,25 @@
+[package]
+name = 'pflexnetr'
+version = '0.1.0'
+edition = '2021'
+
+[lib]
+crate-type = [ 'staticlib' ]
+name = 'pflexnetr'
+
+[dependencies]
+extendr-api = { version = "0.4", features = ["ndarray"] }
+ndarray = { version = "0.15.6", features = ["rayon"]}
+# ndarray-linalg = "0.16.0"
+# ndarray-linalg = { version = "0.16.0", features = ["openblas"] }
+ndarray-linalg = { version = "0.16.0", features = ["intel-mkl-static"] }
+# ndarray-linalg = { version = "0.16.0", features = ["netlib-static"] }
+rayon = "1.7.0"
+rand = "0.8.5"
+statrs = "0.16.0"
+
+[profile.dev]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
