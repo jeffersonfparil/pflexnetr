@@ -89,55 +89,17 @@ pub fn expand_and_contract(
             added_depenalised += normed[i];
         }
     }
-    // println!("BEFORE: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-    // println!("PENALISED:");
-    // println!("subtracted_penalised={}", subtracted_penalised);
-    // println!("added_penalised={}", added_penalised);
-    // println!("DEPENALISED:");
-    // println!("subtracted_depenalised={}", subtracted_depenalised);
-    // println!("added_depenalised={}", added_depenalised);
-    // Account for the absence of available slots to transfer the contracted effects into
-    if (subtracted_penalised > 0.0) & (subtracted_depenalised == 0.0) {
-        added_penalised -= subtracted_penalised;
-        subtracted_penalised = 0.0;
-    } else if (added_penalised > 0.0) & (added_depenalised == 0.0) {
-        subtracted_penalised -= added_penalised;
-        added_penalised = 0.0;
-    }
-    // if (subtracted_penalised < 0.0) | (added_penalised < 0.0) {
-    //     println!("AFTER: ###############################################");
-    //     println!("PENALISED:");
-    //     println!("subtracted_penalised={}", subtracted_penalised);
-    //     println!("added_penalised={}", added_penalised);
-    //     println!("DEPENALISED:");
-    //     println!("subtracted_depenalised={}", subtracted_depenalised);
-    //     println!("added_depenalised={}", added_depenalised);
-    // }
-    // if subtracted_penalised < 0.0 {
-    //     subtracted_penalised = 0.0;
-    // }
-    // if added_penalised < 0.0 {
-    //     added_penalised = 0.0;
-    // }
-    
     for i in idx_depenalised.into_iter() {
-        // if b_hat[i + 1] >= 0.0 {
-        //     b_hat[i + 1] = b_hat[i + 1].signum() * (b_hat[i + 1].abs() + subtracted_penalised * (normed[i] / subtracted_depenalised));
-        //     // b_hat[i + 1] += subtracted_penalised * (normed[i] / subtracted_depenalised);
-        //     // b_hat[i + 1] += subtracted_penalised.abs() * (normed[i] / subtracted_depenalised);
+        // let q = subtracted_penalised.signum() * (subtracted_penalised.abs() - added_penalised.abs()).abs()  
+        //         * (normed[i] / (subtracted_depenalised.abs() + added_depenalised.abs()));
+        let q = normed[i] * (subtracted_penalised - added_penalised) / (subtracted_depenalised + added_depenalised);
+        // let q = if b_hat[i + 1] >= 0.0 {
+        //     normed[i] * subtracted_penalised / (subtracted_depenalised + added_depenalised)
         // } else {
-        //     b_hat[i + 1] = b_hat[i + 1].signum() * (b_hat[i + 1].abs() + added_penalised * (normed[i] / added_depenalised));
-        //     // b_hat[i + 1] -= added_penalised * (normed[i] / added_depenalised);
-        //     // b_hat[i + 1] -= added_penalised.abs() * (normed[i] / added_depenalised);
-        // }
-        // subtracted_penalised = subtracted_penalised.abs();
-        // added_penalised = added_penalised.abs();
-        let q = (subtracted_penalised - added_penalised) * (normed[i] / (subtracted_depenalised + added_depenalised));
-        // let q = total_penalised * (normed[i] / (subtracted_depenalised + added_depenalised));
-        b_hat[i + 1] = b_hat[i + 1].signum() * (b_hat[i + 1].abs() + q);
+        //     -normed[i] * added_penalised / (subtracted_depenalised + added_depenalised)
+        // };
+        b_hat[i + 1] = b_hat[i + 1] + q;
     }
-    // Insert the unpenalised intercept
-    b_hat[0] = intercept;
     Ok(b_hat)
 }
 
