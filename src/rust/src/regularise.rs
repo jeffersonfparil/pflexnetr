@@ -41,8 +41,6 @@ pub fn expand_and_contract(
     // Clone b_hat
     let mut b_hat: Array1<f64> = b_hat.clone();
     let p = b_hat.len();
-    // Exclude the intercept from penalisation
-    let intercept = b_hat[0];
     // Norm 1 or norm 2 (exclude the intercept)
     let normed1: Array1<f64> = b_hat.slice(s![1..p]).map(|&x| x.abs());
     let normed2 = b_hat.slice(s![1..p]).map(|&x| x.powf(2.0));
@@ -88,16 +86,37 @@ pub fn expand_and_contract(
         } else {
             added_depenalised += normed[i];
         }
+        // b_hat[i + 1] = b_hat[i + 1].signum() * vec![(b_hat[i + 1].abs() + normed[i]), 0.0].max();
     }
+    // println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    // println!("subtracted_penalised={} | subtracted_depenalised={}", subtracted_penalised, subtracted_depenalised);
+    // println!("added_penalised={} | added_depenalised={}", added_penalised, added_depenalised);
+    // Account for the absence of available slots to transfer the contracted effects into
+    if (subtracted_penalised > 0.0) & (subtracted_depenalised == 0.0) {
+        added_penalised -= subtracted_penalised;
+        subtracted_penalised = 0.0;
+    } else if (added_penalised > 0.0) & (added_depenalised == 0.0) {
+        subtracted_penalised -= added_penalised;
+        added_penalised = 0.0;
+    }
+    // Depenalise - correct OLS betas
     for i in idx_depenalised.into_iter() {
-        // let q = subtracted_penalised.signum() * (subtracted_penalised.abs() - added_penalised.abs()).abs()  
-        //         * (normed[i] / (subtracted_depenalised.abs() + added_depenalised.abs()));
-        let q = normed[i] * (subtracted_penalised - added_penalised) / (subtracted_depenalised + added_depenalised);
+        // // Incorrect depenalisation on tests and performs poorly
         // let q = if b_hat[i + 1] >= 0.0 {
-        //     normed[i] * subtracted_penalised / (subtracted_depenalised + added_depenalised)
+        //     (subtracted_penalised - added_penalised)  
+        //         * normed[i] / (subtracted_depenalised + added_depenalised)
         // } else {
-        //     -normed[i] * added_penalised / (subtracted_depenalised + added_depenalised)
+        //     (added_penalised - subtracted_penalised)  
+        //         * normed[i] / (subtracted_depenalised + added_depenalised)
         // };
+        // // Incorrect depenalisation on tests and performs horribly
+        // let q = (subtracted_penalised - added_penalised) * normed[i] / (subtracted_depenalised + added_depenalised);
+        // Correct on tests but performs poorly also does phenomenally well if simulated QTL effects are all positive and the simulated phenotypes are untransformed
+        let q = if b_hat[i + 1] >= 0.0 {
+            subtracted_penalised * normed[i] / subtracted_depenalised
+        } else {
+            -added_penalised * normed[i] / added_depenalised
+        };
         b_hat[i + 1] = b_hat[i + 1] + q;
     }
     Ok(b_hat)
@@ -109,35 +128,35 @@ mod tests {
     use super::*;
     #[test]
     fn test_penalise() {
-        let a: Array1<f64> =
+        let x: Array1<f64> =
+            Array1::from_shape_vec(7, vec![5.0, 0.4, 0.0, 1.0, 0.1, 1.0, 0.0]).unwrap();
+        assert_eq!(
+            expand_and_contract(&x, &x, 1.00, 0.5).unwrap(),
+            Array1::from_shape_vec(7, vec![5.0, 0.0, 0.0, 1.25, 0.0, 1.25, 0.0]).unwrap()
+        );
+        let x: Array1<f64> =
+            Array1::from_shape_vec(7, vec![5.0, -0.4, 0.0, -1.0, -0.1, -1.0, 0.0]).unwrap();
+        assert_eq!(
+            expand_and_contract(&x, &x, 1.00, 0.5).unwrap(),
+            Array1::from_shape_vec(7, vec![5.0, 0.0, 0.0, -1.25, 0.0, -1.25, 0.0]).unwrap()
+        );
+        let x: Array1<f64> =
             Array1::from_shape_vec(7, vec![5.0, -0.4, 0.0, 1.0, -0.1, 1.0, 0.0]).unwrap();
         assert_eq!(
-            expand_and_contract(&a, &a, 1.00, 0.5).unwrap(),
+            expand_and_contract(&x, &x, 1.00, 0.5).unwrap(),
             Array1::from_shape_vec(7, vec![5.0, 0.0, 0.0, 0.75, 0.0, 0.75, 0.0]).unwrap()
         );
-        let b: Array1<f64> =
+        let x: Array1<f64> =
             Array1::from_shape_vec(7, vec![5.0, 0.4, 0.0, -1.0, 0.1, -1.0, 0.0]).unwrap();
         assert_eq!(
-            expand_and_contract(&b, &b, 1.00, 0.5).unwrap(),
+            expand_and_contract(&x, &x, 1.00, 0.5).unwrap(),
             Array1::from_shape_vec(7, vec![5.0, 0.0, 0.0, -0.75, 0.0, -0.75, 0.0]).unwrap()
         );
-        let c: Array1<f64> =
-            Array1::from_shape_vec(7, vec![5.0, 0.0, 0.0, 1.0, -0.4, 1.0, 0.0]).unwrap();
+        let x: Array1<f64> =
+            Array1::from_shape_vec(7, vec![5.0, 0.4, 0.0, 1.0, -0.1, -1.0, 0.0]).unwrap();
         assert_eq!(
-            expand_and_contract(&c, &c, 1.00, 0.5).unwrap(),
-            Array1::from_shape_vec(7, vec![5.0, 0.0, 0.0, 0.8, 0.0, 0.8, 0.0]).unwrap()
-        );
-        // let d: Array1<f64> =
-        //     Array1::from_shape_vec(7, vec![5.0, 0.4, 1.0, -1.0, -0.4, -1.0, 1.0]).unwrap();
-        // assert_eq!(
-        //     expand_and_contract(&d, &d, 1.00, 0.5).unwrap(),
-        //     Array1::from_shape_vec(7, vec![5.0, 0.0, 1.2, -1.2, 0.0, -1.2, 1.2]).unwrap()
-        // );
-        let a: Array1<f64> =
-            Array1::from_shape_vec(7, vec![5.0, -0.5, 0.0, 1.0, -0.4, 1.0, 0.0]).unwrap();
-        assert_eq!(
-            expand_and_contract(&a, &a, 1.0, 0.5).unwrap(),
-            Array1::from_shape_vec(7, vec![5.0, -0.58, 0.0, 0.84, 0.0, 0.84, 0.0]).unwrap()
+            expand_and_contract(&x, &x, 1.00, 0.5).unwrap(),
+            Array1::from_shape_vec(7, vec![5.0, 0.0, 0.0, 1.4, 0.0, -1.10, 0.0]).unwrap()
         );
     }
 }
