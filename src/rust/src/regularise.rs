@@ -111,12 +111,18 @@ pub fn expand_and_contract(
         // };
         // // Incorrect depenalisation on tests and performs horribly
         // let q = (subtracted_penalised - added_penalised) * normed[i] / (subtracted_depenalised + added_depenalised);
-        // Correct on tests but performs poorly also does phenomenally well if simulated QTL effects are all positive and the simulated phenotypes are untransformed
+        // // Correct on tests but performs poorly also does phenomenally well if simulated QTL effects are all positive and the simulated phenotypes are untransformed
         let q = if b_hat[i + 1] >= 0.0 {
             subtracted_penalised * normed[i] / subtracted_depenalised
         } else {
             -added_penalised * normed[i] / added_depenalised
         };
+        // // Testing a new one:
+        // let q = if b_hat[i + 1] >= 0.0 {
+        //     subtracted_penalised * normed[i] / subtracted_depenalised
+        // } else {
+        //     -added_penalised * normed[i] / added_depenalised
+        // };
         b_hat[i + 1] = b_hat[i + 1] + q;
     }
     Ok(b_hat)

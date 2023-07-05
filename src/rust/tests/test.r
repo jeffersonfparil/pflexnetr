@@ -68,6 +68,46 @@ PFLEXNET = function(x_train, x_test, y_train, y_test) {
     return(PERF(y_test, y_hat, y_max))
 }
 
+PFLEXNET_L1 = function(x_train, x_test, y_train, y_test) {
+    mod_pflexnet = pflexnet(cbind(rep(1,nrow(x_train)), x_train),
+                            y_train,
+                            c(0:(nrow(x_train)-1)),
+                            1.0,
+                            FALSE,
+                            0.1,
+                            10)
+    b_pflexnet = mod_pflexnet[[1]]
+    # print("####################################################")
+    # print(paste0("length(b_pflexnet)=", sum(b_pflexnet != 0)))
+    # print(paste0("b_pflexnet = [", paste(b_pflexnet[b_pflexnet != 0][1:min(c(4, sum(b_pflexnet != 0)))], collapse=", ") ,"... ]"))
+    alpha_pflexnet = mod_pflexnet[[2]]
+    lambda_pflexnet = mod_pflexnet[[3]]
+    y_hat = cbind(rep(1,nrow(x_test)), x_test) %*% b_pflexnet
+    y_max = max(c(y_test, y_train), na.rm=TRUE)
+    # PERF(y_test, y_hat, y_max)
+    return(PERF(y_test, y_hat, y_max))
+}
+
+PFLEXNET_L2 = function(x_train, x_test, y_train, y_test) {
+    mod_pflexnet = pflexnet(cbind(rep(1,nrow(x_train)), x_train),
+                            y_train,
+                            c(0:(nrow(x_train)-1)),
+                            0.0,
+                            FALSE,
+                            0.1,
+                            10)
+    b_pflexnet = mod_pflexnet[[1]]
+    # print("####################################################")
+    # print(paste0("length(b_pflexnet)=", sum(b_pflexnet != 0)))
+    # print(paste0("b_pflexnet = [", paste(b_pflexnet[b_pflexnet != 0][1:min(c(4, sum(b_pflexnet != 0)))], collapse=", ") ,"... ]"))
+    alpha_pflexnet = mod_pflexnet[[2]]
+    lambda_pflexnet = mod_pflexnet[[3]]
+    y_hat = cbind(rep(1,nrow(x_test)), x_test) %*% b_pflexnet
+    y_max = max(c(y_test, y_train), na.rm=TRUE)
+    # PERF(y_test, y_hat, y_max)
+    return(PERF(y_test, y_hat, y_max))
+}
+
 KFOLD_CV = function(x, y, r=5, k=10) {
     # k = 10
     ols = c()
@@ -75,6 +115,8 @@ KFOLD_CV = function(x, y, r=5, k=10) {
     ridge = c()
     elastic = c()
     pflex = c()
+    pflex_L1 = c()
+    pflex_L2 = c()
 
     n = length(y)
     s = floor(n/k)
@@ -104,6 +146,8 @@ KFOLD_CV = function(x, y, r=5, k=10) {
             ridge = c(ridge, RIDGE(x_train, x_test, y_train, y_test))
             elastic = c(elastic, ELASTIC(x_train, x_test, y_train, y_test))
             pflex = c(pflex, PFLEXNET(x_train, x_test, y_train, y_test))
+            pflex_L1 = c(pflex_L1, PFLEXNET_L1(x_train, x_test, y_train, y_test))
+            pflex_L2 = c(pflex_L2, PFLEXNET_L2(x_train, x_test, y_train, y_test))
             setTxtProgressBar(pb, ((rep-1)*k)+fold)
         }
     }
@@ -112,23 +156,27 @@ KFOLD_CV = function(x, y, r=5, k=10) {
                 lasso=lasso,
                 ridge=ridge,
                 elastic=elastic,
-                pflex=pflex))
+                pflex=pflex,
+                pflex_L1=pflex_L1,
+                pflex_L2=pflex_L2))
 }
 
 
 ##################
 ### UNIT TESTS ###
 ##################
-rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
+# rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
 out = data.frame()
+set.seed(123)
 for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
 # for (q in c(2)) {
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    print(paste0("q=", q))
     vec_q = c()
     vec_mod = c()
     vec_cor = c()
     vec_rmse = c()
     vec_mbe = c()
-    set.seed(123)
     n = 100
     p = 1000
     maf = 1e-4
@@ -137,8 +185,8 @@ for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
     # X_sim = matrix(sample(c(0,1), size=n*p, replace=TRUE), nrow=n)
     b = rep(0, p)
     idx_b = sort(sample(c(1:p), q))
-    # b[idx_b] = rnorm(q)
-    b[idx_b] = abs(rnorm(q))
+    b[idx_b] = rnorm(q)
+    # b[idx_b] = abs(rnorm(q))
     # b[idx_b] = -abs(rnorm(q))
     xb = X_sim %*% b
     v_xb = var(xb)
@@ -154,10 +202,12 @@ for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
 
     k = 10
     r = 3
+
+    options(digits.secs=7)
     start_time = Sys.time()
     kfold_out = KFOLD_CV(x=X_sim, y=y_sim, k=k, r=r)
     end_time = Sys.time()
-    print(paste0("Time elapsed: ", end_time - start_time))
+    print(end_time - start_time)
 
     plot_model = c()
     plot_y_hat = c()
@@ -203,7 +253,6 @@ for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
     } else {
         out = rbind(out, df_out)
     }
-
 }
 print(out)
 aggregate(correlation ~ model, data=out, FUN=mean)
