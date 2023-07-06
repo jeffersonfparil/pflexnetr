@@ -2,36 +2,6 @@ use ndarray::prelude::*;
 use statrs::statistics::Statistics;
 use std::io;
 
-pub fn varsel(
-    b_hat_proxy: ArrayView1<f64>,
-    alpha: f64,
-    lambda: f64,
-) -> io::Result<Vec<usize>> {
-    // Clone b_hat
-    let p = b_hat_proxy.len();
-    // Proxy norm 1 or norm 2 (exclude the intercept) for finding the loci that need to be penalised
-    let normed1_proxy: Array1<f64> = b_hat_proxy.slice(s![1..p]).map(|&x| x.abs());
-    let normed2_proxy = b_hat_proxy.slice(s![1..p]).map(|&x| x.powf(2.0));
-    let normed_proxy = ((1.00 - alpha) * normed2_proxy / 1.00) + (alpha * normed1_proxy);
-    // Find estimates that will be penalised using the proxy b_hat norms
-    let normed_proxy_min = normed_proxy.view().min();
-    let normed_proxy_max = normed_proxy.view().max();
-    let normed_proxy_scaled: Array1<f64> = (&normed_proxy - normed_proxy_min) / (normed_proxy_max - normed_proxy_min);
-    // let idx_depenalised = normed_proxy_scaled
-    //     .iter()
-    //     .enumerate()
-    //     .filter(|(_, &value)| value >= lambda)
-    //     .map(|(index, _)| index + 1)
-    //     .collect::<Vec<usize>>();
-    let mut idx_depenalised: Vec<usize> = vec![0];
-    for i in 0..normed_proxy_scaled.len() {
-        if normed_proxy_scaled[i] >= lambda {
-            idx_depenalised.push(i + 1);
-        }
-    }
-    Ok(idx_depenalised)
-}
-
 pub fn expand_and_contract(
     b_hat: &Array1<f64>,
     b_hat_proxy: &Array1<f64>,
@@ -44,15 +14,16 @@ pub fn expand_and_contract(
     // Norm 1 or norm 2 (exclude the intercept)
     let normed1: Array1<f64> = b_hat.slice(s![1..p]).map(|&x| x.abs());
     let normed2 = b_hat.slice(s![1..p]).map(|&x| x.powf(2.0));
-    let normed = ((1.00 - alpha) * normed2 / 1.00) + (alpha * normed1);
+    let normed = ((1.00 - alpha) * normed2) + (alpha * normed1);
     // Proxy norm 1 or norm 2 (exclude the intercept) for finding the loci that need to be penalised
     let normed1_proxy: Array1<f64> = b_hat_proxy.slice(s![1..p]).map(|&x| x.abs());
     let normed2_proxy = b_hat_proxy.slice(s![1..p]).map(|&x| x.powf(2.0));
-    let normed_proxy = ((1.00 - alpha) * normed2_proxy / 1.00) + (alpha * normed1_proxy);
+    let normed_proxy = ((1.00 - alpha) * normed2_proxy) + (alpha * normed1_proxy);
     // Find estimates that will be penalised using the proxy b_hat norms
     let normed_proxy_min = normed_proxy.view().min();
     let normed_proxy_max = normed_proxy.view().max();
-    let normed_proxy_scaled: Array1<f64> = (&normed_proxy - normed_proxy_min) / (normed_proxy_max - normed_proxy_min);
+    let normed_proxy_scaled: Array1<f64> =
+        (&normed_proxy - normed_proxy_min) / (normed_proxy_max - normed_proxy_min);
     // let normed_proxy_scaled: Array1<f64> = (&normed_proxy - 0.0) / (normed_proxy_max - 0.0);
     let idx_penalised = normed_proxy_scaled
         .iter()
@@ -103,10 +74,10 @@ pub fn expand_and_contract(
     for i in idx_depenalised.into_iter() {
         // // Incorrect depenalisation on tests and performs poorly
         // let q = if b_hat[i + 1] >= 0.0 {
-        //     (subtracted_penalised - added_penalised)  
+        //     (subtracted_penalised - added_penalised)
         //         * normed[i] / (subtracted_depenalised + added_depenalised)
         // } else {
-        //     (added_penalised - subtracted_penalised)  
+        //     (added_penalised - subtracted_penalised)
         //         * normed[i] / (subtracted_depenalised + added_depenalised)
         // };
         // // Incorrect depenalisation on tests and performs horribly

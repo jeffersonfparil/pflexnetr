@@ -45,7 +45,7 @@ extendr_module! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cv::*;
+    
     use crate::linalg::*;
     use rand::{distributions::*, rngs::StdRng, SeedableRng};
     #[test]
@@ -54,11 +54,11 @@ mod tests {
         let nt = 90;
         let nv = 10;
         let n = nt + nv;
-        let r = 10;
+        let _r = 10;
         // let alpha = 1.0; // L1 norm
         // let alpha = 0.0; // L2 norm
-        let alpha = -1.0; // elastic norm (i.e. any `alpha < 0.0`)
-        let lambda_step_size = 0.1;
+        let _alpha = -1.0; // elastic norm (i.e. any `alpha < 0.0`)
+        let _lambda_step_size = 0.1;
         let p = 1_000;
         let q = 2;
         let h2 = 0.75;
@@ -101,9 +101,9 @@ mod tests {
                 .collect::<Vec<f64>>(),
         )
         .unwrap();
-        let y: Array1<f64> = (&xb + e).column(0).to_owned();
-        let idx_training: Vec<usize> = (0..nt).collect();
-        let idx_validation: Vec<usize> = (nt..n).collect();
+        let _y: Array1<f64> = (&xb + e).column(0).to_owned();
+        let _idx_training: Vec<usize> = (0..nt).collect();
+        let _idx_validation: Vec<usize> = (nt..n).collect();
         // let (b_hat_penalised, alpha, lambda) =
         //     pflexnet(x.view(), y.view(), &idx_training, alpha, false, lambda_step_size, r).unwrap();
         // let b_hat_penalised = pflexnet(x.view(), y.view(), &idx_training, alpha, false, lambda_step_size, r);

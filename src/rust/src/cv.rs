@@ -159,6 +159,16 @@ fn error_index(
     Ok(error_index)
 }
 
+
+// NOTE: glmnet is blazinbgly fast because of its warm-start (probably starting with OLS estimates)
+// resulting to quick convergence, i.e. only a single or a few coordinate-descent steps were needed.
+// This means it's essentially a single step to find betas at a lambda-alpha parameter pair!
+// What we can do better it to apply warm-start with the parameter-pair selection,
+// e.g. start with large lambda and if the difference in performce between a lambda step is less than some threshold,
+// then we stop and say that's the best lambda?!
+
+// Also, ponder/test standardisation of X...
+
 pub fn penalised_lambda_path_with_k_fold_cross_validation(
     x: ArrayView2<f64>,
     y: ArrayView1<f64>,
@@ -172,16 +182,16 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
     let max_usize: usize = (1.0 / lambda_step_size).round() as usize;
     let parameters_path: Array1<f64> = (0..(max_usize + 1))
         .into_iter()
+        .rev() // maybe moving this way we can be more blazingly fast?
         .map(|x| (x as f64) / (max_usize as f64))
         .collect();
 
-// let parameters_path: Array1<f64> = Array1::from_shape_vec(38,
-//         vec![0.0, 0.01, 0.2, 0.3, 0.4, 0.5,
-//                 0.6, 0.7, 0.8, 0.9,
-//                 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99, 
-//                 0.991, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999,
-//                 0.999991, 0.999992, 0.999993, 0.999994, 0.999995, 0.999996, 0.999997, 0.999998, 0.999999, 1.0]).unwrap();
-
+    // let parameters_path: Array1<f64> = Array1::from_shape_vec(38,
+    //         vec![0.0, 0.01, 0.2, 0.3, 0.4, 0.5,
+    //                 0.6, 0.7, 0.8, 0.9,
+    //                 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99,
+    //                 0.991, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999,
+    //                 0.999991, 0.999992, 0.999993, 0.999994, 0.999995, 0.999996, 0.999997, 0.999998, 0.999999, 1.0]).unwrap();
 
     let l = parameters_path.len();
     // If alpha < 0.0 then optimise for alpha in addtion to lambda, else use the user-secified alpha for ridge, lasso or somewhere in between
@@ -237,7 +247,13 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
                 .filter(|(_, x)| *x != &fold)
                 .map(|(i, _)| row_idx[i])
                 .collect();
-            let b_hat = ols(x.view(), y.view(), &idx_training, &(0..x.ncols()).collect::<Vec<usize>>()).unwrap();
+            let b_hat = ols(
+                x.view(),
+                y.view(),
+                &idx_training,
+                &(0..x.ncols()).collect::<Vec<usize>>(),
+            )
+            .unwrap();
             let mut errors: Array2<f64> = Array2::from_elem((a, l), f64::NAN);
             let mut b_hats: Array2<Array1<f64>> =
                 Array2::from_elem((a, l), Array1::from_elem(1, f64::NAN));
@@ -265,7 +281,13 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
                         *b = b_hat_new;
                     });
             } else {
-                let b_hat_proxy = ols_iterative_with_kinship_pca_covariate(x, y, row_idx, &(0..(x.ncols()-1)).collect::<Vec<usize>>()).unwrap();
+                let b_hat_proxy = ols_iterative_with_kinship_pca_covariate(
+                    x,
+                    y,
+                    row_idx,
+                    &(0..(x.ncols() - 1)).collect::<Vec<usize>>(),
+                )
+                .unwrap();
                 Zip::from(&mut errors)
                     .and(&mut b_hats)
                     .and(&alpha_path)
@@ -371,8 +393,13 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
         // b_hat_new
         expand_and_contract(&b_hat, &b_hat, alpha, lambda).unwrap()
     } else {
-        let b_hat_proxy: Array1<f64> =
-            ols_iterative_with_kinship_pca_covariate(x, y, row_idx, &(0..(x.ncols()-1)).collect::<Vec<usize>>()).unwrap();
+        let b_hat_proxy: Array1<f64> = ols_iterative_with_kinship_pca_covariate(
+            x,
+            y,
+            row_idx,
+            &(0..(x.ncols() - 1)).collect::<Vec<usize>>(),
+        )
+        .unwrap();
         expand_and_contract(&b_hat, &b_hat_proxy, alpha, lambda).unwrap()
     };
     Ok((b_hat_penalised, alpha, lambda))

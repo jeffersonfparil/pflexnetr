@@ -168,8 +168,8 @@ KFOLD_CV = function(x, y, r=5, k=10) {
 # rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
 out = data.frame()
 set.seed(123)
-for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
-# for (q in c(2)) {
+# for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
+for (q in c(2, 20)) {
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     print(paste0("q=", q))
     vec_q = c()
@@ -183,10 +183,12 @@ for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
     h2 = 0.75
     X_sim = matrix(runif(n*p, min=maf, max=1-maf), nrow=n)
     # X_sim = matrix(sample(c(0,1), size=n*p, replace=TRUE), nrow=n)
+    # X_sim = scale(X_sim, center=T, scale=T)
+
     b = rep(0, p)
     idx_b = sort(sample(c(1:p), q))
-    b[idx_b] = rnorm(q)
-    # b[idx_b] = abs(rnorm(q))
+    # b[idx_b] = rnorm(q)
+    b[idx_b] = abs(rnorm(q))
     # b[idx_b] = -abs(rnorm(q))
     xb = X_sim %*% b
     v_xb = var(xb)
@@ -195,6 +197,8 @@ for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
     y = xb + e
     y_sim = y
     # y_sim = scale(y, center=T, scale=T)[,1]
+    # y_sim = 100 * (y_sim - min(y_sim)) / (max(y_sim) - min(y_sim))
+
     # y_sim = 100 * (y - min(y)) / (max(y) - min(y))
     # y_sim = 1 * (y - min(y)) / (max(y) - min(y))
     # y_sim = y - mean(y)
@@ -237,9 +241,10 @@ for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
         vec_cor = c(vec_cor, round(100*cor(x, y),2))
         vec_rmse = c(vec_rmse, sqrt(mean((x-y)^2)))
         vec_mbe = c(vec_mbe, mean(x-y))
-        svg(paste0(mod, "-gp.svg"))
+        svg(paste0(mod, "-q", q, "-gp.svg"))
         plot(x=x, y=y, xlab="Observed", ylab="Predicted", pch=19, main=mod); grid()
-        legend("topright", legend=paste0("cor = ", round(100*cor(x=x, y=y),2), "%"))
+        legend("topright", legend=c(paste0("cor = ", round(100*cor(x=x, y=y),2), "%"),
+                                    paste0("rmse = ", round(sqrt(mean((x-y)^2)),7))))
         dev.off()
     }
     df_out = data.frame(q=vec_q, model=vec_mod, correlation=vec_cor, rmse=vec_rmse, mbe=vec_mbe,

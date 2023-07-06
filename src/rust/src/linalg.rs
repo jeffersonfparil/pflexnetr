@@ -322,7 +322,7 @@ mod tests {
                 .unwrap();
         let col_idx_ols_wide = &(0..x_wide.ncols()).collect::<Vec<usize>>();
         let col_idx_ols_tall = &(0..x_tall.ncols()).collect::<Vec<usize>>();
-        let col_idx_ols__ = &(0..(x_wide.ncols()-1)).collect::<Vec<usize>>();
+        let col_idx_ols__ = &(0..(x_wide.ncols() - 1)).collect::<Vec<usize>>();
         // Outputs
         let a_x_b =
             multiply_views_xx(a.view(), b.view(), &idx_w3, &idx_x2, &idx_y2, &idx_z2).unwrap();
@@ -330,13 +330,29 @@ mod tests {
             multiply_views_xtx(a.view(), b.view(), &idx_w3, &idx_x2, &idx_w3, &idx_z2).unwrap();
         let a_x_bt =
             multiply_views_xxt(a.view(), b.view(), &idx_w3, &idx_x2, &idx_w3, &idx_z2).unwrap();
-        let b_wide = ols(x_wide.view(), y.view(), &vec![0, 1, 2, 3, 4], col_idx_ols_wide).unwrap();
-        let b_tall = ols(x_tall.view(), y.view(), &vec![0, 1, 2, 3, 4], col_idx_ols_tall).unwrap();
+        let b_wide = ols(
+            x_wide.view(),
+            y.view(),
+            &vec![0, 1, 2, 3, 4],
+            col_idx_ols_wide,
+        )
+        .unwrap();
+        let b_tall = ols(
+            x_tall.view(),
+            y.view(),
+            &vec![0, 1, 2, 3, 4],
+            col_idx_ols_tall,
+        )
+        .unwrap();
         let y_hat_wide = &x_wide.dot(&b_wide).mapv(|x| sensible_round(x, 4));
         let y_hat_tall = &x_tall.dot(&b_tall).mapv(|x| sensible_round(x, 4));
-        let _b_wide_iterative =
-            ols_iterative_with_kinship_pca_covariate(x_wide.view(), y.view(), &vec![0, 1, 2, 3, 4], col_idx_ols__)
-                .unwrap();
+        let _b_wide_iterative = ols_iterative_with_kinship_pca_covariate(
+            x_wide.view(),
+            y.view(),
+            &vec![0, 1, 2, 3, 4],
+            col_idx_ols__,
+        )
+        .unwrap();
         // Assertions
         assert_eq!(
             a_x_b,
