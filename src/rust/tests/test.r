@@ -1,6 +1,6 @@
 library(glmnet)
 
-PERF = function(y_test, y_hat, max_y) {
+PERF = function(y_test, y_hat) {
     n = length(y_test)
     if ((var(y_hat)==0) | (var(y_test)==0)) {
         cor = 0.0
@@ -8,47 +8,50 @@ PERF = function(y_test, y_hat, max_y) {
         cor = cor(y_test, y_hat)
     }
     e = y_test - y_hat
-    mbe = ( sum(e)/n ) / max_y
-    mae = ( sum(abs(e))/n ) / max_y
-    mse = ( sum(e^2)/n ) / max_y
-    rmse = ( sqrt(sum(e^2)/n) ) / max_y
+    mbe = ( sum(e)/n )
+    mae = ( sum(abs(e))/n )
+    mse = ( sum(e^2)/n )
+    rmse = ( sqrt(sum(e^2)/n) )
     return(list(cor=cor, mbe=mbe, mae=mae, mse=mse, rmse=rmse, y_hat=y_hat, y_test=y_test))
 }
 
 OLS = function(x_train, x_test, y_train, y_test) {
     b_hat = t(x_train) %*% solve(x_train %*% t(x_train)) %*% y_train
     y_hat = (x_test %*% b_hat)[,1]
-    y_max = max(c(y_test, y_train), na.rm=TRUE)
-    # plot(abs(b_hat))
-    # for (x in idx_b) {
-    #     abline(v=x, col="red", lwd=2)
-    # }
-    return(PERF(y_test, y_hat, y_max))
+    return(PERF(y_test, y_hat))
 }
 
 LASSO = function(x_train, x_test, y_train, y_test) {
     mod_lasso = cv.glmnet(x=x_train, y=y_train, alpha=1.0)
     y_hat = predict(mod_lasso, newx=x_test, s="lambda.min")[,1]
-    y_max = max(c(y_test, y_train), na.rm=TRUE)
-    return(PERF(y_test, y_hat, y_max))
+    return(PERF(y_test, y_hat))
 }
 
 RIDGE = function(x_train, x_test, y_train, y_test) {
     mod_ridge = cv.glmnet(x=x_train, y=y_train, alpha=0.0)
     y_hat = predict(mod_ridge, newx=x_test, s="lambda.min")[,1]
-    y_max = max(c(y_test, y_train), na.rm=TRUE)
-    return(PERF(y_test, y_hat, y_max))
+    return(PERF(y_test, y_hat))
 }
 
 ELASTIC = function(x_train, x_test, y_train, y_test) {
     mod_elastic = cv.glmnet(x=x_train, y=y_train)
     y_hat = predict(mod_elastic, newx=x_test, s="lambda.min")[,1]
-    y_max = max(c(y_test, y_train), na.rm=TRUE)
-    return(PERF(y_test, y_hat, y_max))
+    return(PERF(y_test, y_hat))
 }
 
 rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
 PFLEXNET = function(x_train, x_test, y_train, y_test) {
+	
+    ### Destandardise
+    standardise = ((abs(1-sd(c(y_train, y_test)))< 0.1) & (abs(mean(c(y_train, y_test))) < 0.1))
+    if (standardise == TRUE) {
+        sigma = 2.00 * sd(c(y_train, y_test))
+        mu = 2.00 * sigma
+        y_train = (y_train * sigma) + mu
+        # x_train = (x_train * sigma) + mu
+        y_test = (y_test * sigma) + mu
+        # x_test = (x_test * sigma) + mu
+    }
     mod_pflexnet = pflexnet(cbind(rep(1,nrow(x_train)), x_train),
                             y_train,
                             c(0:(nrow(x_train)-1)),
@@ -63,9 +66,13 @@ PFLEXNET = function(x_train, x_test, y_train, y_test) {
     alpha_pflexnet = mod_pflexnet[[2]]
     lambda_pflexnet = mod_pflexnet[[3]]
     y_hat = cbind(rep(1,nrow(x_test)), x_test) %*% b_pflexnet
-    y_max = max(c(y_test, y_train), na.rm=TRUE)
-    # PERF(y_test, y_hat, y_max)
-    return(PERF(y_test, y_hat, y_max))
+    ### Restandardise
+    if (standardise == TRUE) {
+        y_train = (y_train-mu)/sigma
+        y_test = (y_test-mu)/sigma
+        y_hat = (y_hat-mu)/sigma
+     }
+    return(PERF(y_test, y_hat))
 }
 
 PFLEXNET_L1 = function(x_train, x_test, y_train, y_test) {
@@ -83,9 +90,7 @@ PFLEXNET_L1 = function(x_train, x_test, y_train, y_test) {
     alpha_pflexnet = mod_pflexnet[[2]]
     lambda_pflexnet = mod_pflexnet[[3]]
     y_hat = cbind(rep(1,nrow(x_test)), x_test) %*% b_pflexnet
-    y_max = max(c(y_test, y_train), na.rm=TRUE)
-    # PERF(y_test, y_hat, y_max)
-    return(PERF(y_test, y_hat, y_max))
+    return(PERF(y_test, y_hat))
 }
 
 PFLEXNET_L2 = function(x_train, x_test, y_train, y_test) {
@@ -103,9 +108,7 @@ PFLEXNET_L2 = function(x_train, x_test, y_train, y_test) {
     alpha_pflexnet = mod_pflexnet[[2]]
     lambda_pflexnet = mod_pflexnet[[3]]
     y_hat = cbind(rep(1,nrow(x_test)), x_test) %*% b_pflexnet
-    y_max = max(c(y_test, y_train), na.rm=TRUE)
-    # PERF(y_test, y_hat, y_max)
-    return(PERF(y_test, y_hat, y_max))
+    return(PERF(y_test, y_hat))
 }
 
 KFOLD_CV = function(x, y, r=5, k=10) {
@@ -169,10 +172,11 @@ KFOLD_CV = function(x, y, r=5, k=10) {
 out = data.frame()
 set.seed(123)
 # for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
-for (q in c(2, 20)) {
+for (q in c(2)) {
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     print(paste0("q=", q))
     vec_q = c()
+    vec_y_scaled = c()
     vec_mod = c()
     vec_cor = c()
     vec_rmse = c()
@@ -187,22 +191,63 @@ for (q in c(2, 20)) {
 
     b = rep(0, p)
     idx_b = sort(sample(c(1:p), q))
-    # b[idx_b] = rnorm(q)
-    b[idx_b] = abs(rnorm(q))
+    b[idx_b] = rnorm(q)
+    # b[idx_b] = abs(rnorm(q))
     # b[idx_b] = -abs(rnorm(q))
     xb = X_sim %*% b
     v_xb = var(xb)
     v_e = (v_xb/h2) - v_xb
     e = rnorm(n, mean=0, sd=sqrt(v_e))
     y = xb + e
-    y_sim = y
-    # y_sim = scale(y, center=T, scale=T)[,1]
+    # y_sim = y
+    y_sim = scale(y, center=T, scale=T)[,1]
+    # y_sim = scale(y, center=T, scale=F)[,1]
     # y_sim = 100 * (y_sim - min(y_sim)) / (max(y_sim) - min(y_sim))
 
     # y_sim = 100 * (y - min(y)) / (max(y) - min(y))
     # y_sim = 1 * (y - min(y)) / (max(y) - min(y))
     # y_sim = y - mean(y)
     # y_sim = y *100
+
+    # # ### Using Arabidopsis data
+    # # if (!require("BiocManager", quietly = TRUE))
+    # #     install.packages("BiocManager")# BiocManager::install("snpStats")
+    # # install.packages("PhenotypeSimulator")
+    # # random genetic variance: h2b 
+    # SIM = PhenotypeSimulator::runSimulation(N = 100, P = 1,  tNrSNP = 1000,
+    #                         SNPfrequencies = c(0.05, 0.1,0.3,0.4), 
+    #                         genVar = 0.4, h2bg = 1, phi = 1, 
+    #                         verbose = TRUE, nonlinear="exp", 
+    #                         proportionNonlinear = 0.0)
+    # # genVar = 0.6
+    # # noiseVar = 1 - genVar
+    # # totalSNPeffect = 0.01
+    # # h2s = totalSNPeffect/genVar
+    # # phi = 0.6 
+    # # rho = 0.1
+    # # delta = 0.3
+    # # shared = 0.8
+    # # independent = 1 - shared
+    # # SIM = PhenotypeSimulator::runSimulation(N = 100, P = 1, tNrSNP = 10000, SNPfrequencies = c(0.05, 0.1,0.3,0.4), 
+    # #     format = "oxgen", cNrSNP = 30, genVar = genVar, h2s = h2s, 
+    # #     phi = 0.6, delta = 0.3, distBetaGenetic = "unif", mBetaGenetic = 0.5, 
+    # #     sdBetaGenetic = 1, NrFixedEffects = 4, NrConfounders = c(1, 2, 1, 2),
+    # #     pIndependentConfounders = c(0, 1, 1, 0.5), 
+    # #     distConfounders = c("bin", "cat_norm", "cat_unif", "norm"), 
+    # #     probConfounders = 0.2, catConfounders = c(3, 4), pcorr = 0.8, 
+    # #     verbose = TRUE)
+    # y_sim = SIM$phenoComponentsFinal$Y[,1]
+    # X_sim = SIM$rawComponents$genotypes$genotypes 
+    # # b = t(X) %*% solve(X %*% t(X)) %*% y
+    # # y_hat = X %*% b
+    # # sum(y - y_hat)
+
+    ### Usigng Athaliana data
+    library(reticulate)
+    np = import("numpy")
+    # data reading
+    X_sim = np$load("./res/flowering_time_10deg_ld_filtered_maf0.05_windowkb10_r20.8.npy")
+    y_sim = np$load("./res/flowering_time_10degphenotype_values.npy")
 
     k = 10
     r = 3
@@ -262,3 +307,6 @@ for (q in c(2, 20)) {
 print(out)
 aggregate(correlation ~ model, data=out, FUN=mean)
 aggregate(rmse ~ model, data=out, FUN=mean)
+# aggregate(mbe ~ model, data=out, FUN=mean)
+
+

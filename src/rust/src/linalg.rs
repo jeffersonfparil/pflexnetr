@@ -114,6 +114,7 @@ pub fn multiply_views_xxt(
     Ok(out)
 }
 
+// Has the potential to be parallelised! Currently slower than A.inv() but more correct when n < p (see test and create a test for A.inv() to see the incorrectness of A.inv())
 pub fn pinv(x: ArrayView2<f64>) -> io::Result<Array2<f64>> {
     let n: usize = x.nrows();
     let p: usize = x.ncols();

@@ -45,7 +45,7 @@ extendr_module! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use crate::linalg::*;
     use rand::{distributions::*, rngs::StdRng, SeedableRng};
     #[test]

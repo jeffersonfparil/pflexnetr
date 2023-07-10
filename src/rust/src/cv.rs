@@ -159,7 +159,6 @@ fn error_index(
     Ok(error_index)
 }
 
-
 // NOTE: glmnet is blazinbgly fast because of its warm-start (probably starting with OLS estimates)
 // resulting to quick convergence, i.e. only a single or a few coordinate-descent steps were needed.
 // This means it's essentially a single step to find betas at a lambda-alpha parameter pair!
@@ -231,7 +230,7 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
     let (_, nfolds, _s) = k_split(row_idx, 10, &mut rng).unwrap();
     let mut performances: Array4<f64> = Array4::from_elem((r, nfolds, a, l), f64::NAN);
     for rep in 0..r {
-        let mut rng = StdRng::seed_from_u64(rep as u64);
+        // let mut rng = StdRng::seed_from_u64(rep as u64);
         let (groupings, _, _) = k_split(row_idx, 10, &mut rng).unwrap();
         // println!("groupings={:?}", groupings);
         for fold in 0..nfolds {
