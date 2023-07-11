@@ -173,7 +173,6 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
     y: ArrayView1<f64>,
     row_idx: &Vec<usize>,
     alpha: f64,
-    kinship_covar: bool,
     lambda_step_size: f64,
     r: usize,
 ) -> io::Result<(Array1<f64>, f64, f64)> {
@@ -246,6 +245,7 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
                 .filter(|(_, x)| *x != &fold)
                 .map(|(i, _)| row_idx[i])
                 .collect();
+            println!("OLS");
             let b_hat = ols(
                 x.view(),
                 y.view(),
@@ -253,51 +253,31 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
                 &(0..x.ncols()).collect::<Vec<usize>>(),
             )
             .unwrap();
+            println!("OLS finished");
             let mut errors: Array2<f64> = Array2::from_elem((a, l), f64::NAN);
             let mut b_hats: Array2<Array1<f64>> =
                 Array2::from_elem((a, l), Array1::from_elem(1, f64::NAN));
-            if kinship_covar == false {
-                Zip::from(&mut errors)
-                    .and(&mut b_hats)
-                    .and(&alpha_path)
-                    .and(&lambda_path)
-                    .par_for_each(|err, b, &alfa, &lambda| {
-                        // let idx_depenalised = varsel(b_hat.view(), alfa, lambda).unwrap();
-                        // let b_hat_new = if idx_depenalised.len() < x.ncols() {
-                        //     let b_hat_tmp: Array1<f64> = ols(x.view(), y.view(), &idx_training, &idx_depenalised).unwrap();
-                        //     let mut b_hat_new: Array1<f64> = Array1::from_elem(x.ncols(), 0.0);
-                        //     for i in 0..idx_depenalised.len() {
-                        //         let idx = idx_depenalised[i];
-                        //         b_hat_new[idx] = b_hat_tmp[i];
-                        //     }
-                        //     b_hat_new
-                        // } else {
-                        //     b_hat.clone()
-                        // };
-                        let b_hat_new: Array1<f64> =
-                            expand_and_contract(&b_hat, &b_hat, alfa, lambda).unwrap();
-                        *err = error_index(b_hat_new.view(), x, y, &idx_validation).unwrap();
-                        *b = b_hat_new;
-                    });
-            } else {
-                let b_hat_proxy = ols_iterative_with_kinship_pca_covariate(
-                    x,
-                    y,
-                    row_idx,
-                    &(0..(x.ncols() - 1)).collect::<Vec<usize>>(),
-                )
-                .unwrap();
-                Zip::from(&mut errors)
-                    .and(&mut b_hats)
-                    .and(&alpha_path)
-                    .and(&lambda_path)
-                    .par_for_each(|err, b, &alfa, &lambda| {
-                        let b_hat_new: Array1<f64> =
-                            expand_and_contract(&b_hat, &b_hat_proxy, alfa, lambda).unwrap();
-                        *err = error_index(b_hat_new.view(), x, y, &idx_validation).unwrap();
-                        *b = b_hat_new;
-                    });
-            }
+            Zip::from(&mut errors)
+                .and(&mut b_hats)
+                .and(&alpha_path)
+                .and(&lambda_path)
+                .par_for_each(|err, b, &alfa, &lambda| {
+                    // let idx_depenalised = varsel(b_hat.view(), alfa, lambda).unwrap();
+                    // let b_hat_new = if idx_depenalised.len() < x.ncols() {
+                    //     let b_hat_tmp: Array1<f64> = ols(x.view(), y.view(), &idx_training, &idx_depenalised).unwrap();
+                    //     let mut b_hat_new: Array1<f64> = Array1::from_elem(x.ncols(), 0.0);
+                    //     for i in 0..idx_depenalised.len() {
+                    //         let idx = idx_depenalised[i];
+                    //         b_hat_new[idx] = b_hat_tmp[i];
+                    //     }
+                    //     b_hat_new
+                    // } else {
+                    //     b_hat.clone()
+                    // };
+                    let b_hat_new: Array1<f64> = expand_and_contract(&b_hat, alfa, lambda).unwrap();
+                    *err = error_index(b_hat_new.view(), x, y, &idx_validation).unwrap();
+                    *b = b_hat_new;
+                });
             // println!("#########################################");
             // println!("alpha_path={:?}", alpha_path);
             // println!("lambda_path={:?}", lambda_path);
@@ -381,26 +361,7 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
     ///////////////////////////////////
 
     let b_hat: Array1<f64> = ols(x, y, row_idx, &(0..x.ncols()).collect::<Vec<usize>>()).unwrap();
-    let b_hat_penalised: Array1<f64> = if kinship_covar == false {
-        // let idx_depenalised = varsel(b_hat.view(), alpha, lambda).unwrap();
-        // let b_hat_tmp: Array1<f64> = ols(x.view(), y.view(), &(0..x.nrows()).collect::<Vec<usize>>(), &idx_depenalised).unwrap();
-        // let mut b_hat_new: Array1<f64> = Array1::from_elem(x.ncols(), 0.0);
-        // for i in 0..idx_depenalised.len() {
-        //     let idx = idx_depenalised[i];
-        //     b_hat_new[idx] = b_hat_tmp[i];
-        // }
-        // b_hat_new
-        expand_and_contract(&b_hat, &b_hat, alpha, lambda).unwrap()
-    } else {
-        let b_hat_proxy: Array1<f64> = ols_iterative_with_kinship_pca_covariate(
-            x,
-            y,
-            row_idx,
-            &(0..(x.ncols() - 1)).collect::<Vec<usize>>(),
-        )
-        .unwrap();
-        expand_and_contract(&b_hat, &b_hat_proxy, alpha, lambda).unwrap()
-    };
+    let b_hat_penalised: Array1<f64> = expand_and_contract(&b_hat, alpha, lambda).unwrap();
     Ok((b_hat_penalised, alpha, lambda))
 }
 

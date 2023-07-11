@@ -10,7 +10,6 @@ fn pflexnet(
     y: ArrayView1<f64>,
     row_idx: ArrayView1<i32>,
     alpha: f64,
-    kinship_covar: bool,
     lambda_step_size: f64,
     r: i32,
 ) -> Robj {
@@ -23,15 +22,14 @@ fn pflexnet(
             .map(|x| x as usize)
             .collect::<Vec<usize>>(),
         alpha,
-        kinship_covar,
         lambda_step_size,
         r as usize,
     )
     .unwrap();
-    let q = beta.try_into().unwrap();
+    let q: Robj = beta.try_into().unwrap();
     let r: Robj = Array1::from_elem(1, alpha).try_into().unwrap();
     let s: Robj = Array1::from_elem(1, lambda).try_into().unwrap();
-    let list = r!(List::from_values(&[q, r, s]));
+    let list: Robj = r!(List::from_values(&[q, r, s]));
     // beta.try_into().unwrap()
     list
 }

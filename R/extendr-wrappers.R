@@ -11,7 +11,7 @@
 #' @useDynLib pflexnetr, .registration = TRUE
 NULL
 
-pflexnet <- function(x, y, row_idx, alpha, kinship_covar, lambda_step_size, r) .Call(wrap__pflexnet, x, y, row_idx, alpha, kinship_covar, lambda_step_size, r)
+pflexnet <- function(x, y, row_idx, alpha, lambda_step_size, r) .Call(wrap__pflexnet, x, y, row_idx, alpha, lambda_step_size, r)
 
 
 # nolint end

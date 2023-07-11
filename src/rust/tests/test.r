@@ -34,7 +34,7 @@ RIDGE = function(x_train, x_test, y_train, y_test) {
 }
 
 ELASTIC = function(x_train, x_test, y_train, y_test) {
-    mod_elastic = cv.glmnet(x=x_train, y=y_train)
+    mod_elastic = cv.glmnet(x=x_train, y=y_train, alpha=seq(0, 1, by=0.1))
     y_hat = predict(mod_elastic, newx=x_test, s="lambda.min")[,1]
     return(PERF(y_test, y_hat))
 }
@@ -56,7 +56,6 @@ PFLEXNET = function(x_train, x_test, y_train, y_test) {
                             y_train,
                             c(0:(nrow(x_train)-1)),
                             -1.0,
-                            FALSE,
                             0.1,
                             10)
     b_pflexnet = mod_pflexnet[[1]]
@@ -80,7 +79,6 @@ PFLEXNET_L1 = function(x_train, x_test, y_train, y_test) {
                             y_train,
                             c(0:(nrow(x_train)-1)),
                             1.0,
-                            FALSE,
                             0.1,
                             10)
     b_pflexnet = mod_pflexnet[[1]]
@@ -98,7 +96,6 @@ PFLEXNET_L2 = function(x_train, x_test, y_train, y_test) {
                             y_train,
                             c(0:(nrow(x_train)-1)),
                             0.0,
-                            FALSE,
                             0.1,
                             10)
     b_pflexnet = mod_pflexnet[[1]]
@@ -182,7 +179,7 @@ for (q in c(2)) {
     vec_rmse = c()
     vec_mbe = c()
     n = 100
-    p = 1000
+    p = 1e5
     maf = 1e-4
     h2 = 0.75
     X_sim = matrix(runif(n*p, min=maf, max=1-maf), nrow=n)
@@ -199,8 +196,8 @@ for (q in c(2)) {
     v_e = (v_xb/h2) - v_xb
     e = rnorm(n, mean=0, sd=sqrt(v_e))
     y = xb + e
-    # y_sim = y
-    y_sim = scale(y, center=T, scale=T)[,1]
+    y_sim = y
+    # y_sim = scale(y, center=T, scale=T)[,1]
     # y_sim = scale(y, center=T, scale=F)[,1]
     # y_sim = 100 * (y_sim - min(y_sim)) / (max(y_sim) - min(y_sim))
 
@@ -242,12 +239,29 @@ for (q in c(2)) {
     # # y_hat = X %*% b
     # # sum(y - y_hat)
 
-    ### Usigng Athaliana data
-    library(reticulate)
-    np = import("numpy")
-    # data reading
-    X_sim = np$load("./res/flowering_time_10deg_ld_filtered_maf0.05_windowkb10_r20.8.npy")
-    y_sim = np$load("./res/flowering_time_10degphenotype_values.npy")
+    # ### Usigng Athaliana data
+    # library(reticulate)
+    # np = import("numpy")
+    # # data reading
+    # X_sim = np$load("./res/flowering_time_10deg_ld_filtered_maf0.05_windowkb10_r20.8.npy")
+    # y_sim = as.vector(np$load("./res/flowering_time_10degphenotype_values.npy"))
+
+options(digits.secs=7)
+start_time = Sys.time()
+mod_elastic = cv.glmnet(x=x_train, y=y_train)
+end_time = Sys.time()
+print(end_time - start_time)
+
+start_time = Sys.time()
+mod_pflexnet = pflexnet(cbind(rep(1,nrow(x_train)), x_train),
+                            y_train,
+                            c(0:(nrow(x_train)-1)),
+                            -1.0,
+                            0.1,
+                            10)
+end_time = Sys.time()
+print(end_time - start_time)
+
 
     k = 10
     r = 3
