@@ -245,7 +245,6 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
                 .filter(|(_, x)| *x != &fold)
                 .map(|(i, _)| row_idx[i])
                 .collect();
-            println!("OLS");
             let b_hat = ols(
                 x.view(),
                 y.view(),
@@ -253,7 +252,6 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
                 &(0..x.ncols()).collect::<Vec<usize>>(),
             )
             .unwrap();
-            println!("OLS finished");
             let mut errors: Array2<f64> = Array2::from_elem((a, l), f64::NAN);
             let mut b_hats: Array2<Array1<f64>> =
                 Array2::from_elem((a, l), Array1::from_elem(1, f64::NAN));
