@@ -24,6 +24,7 @@ OLS = function(x_train, x_test, y_train, y_test) {
 
 LASSO = function(x_train, x_test, y_train, y_test) {
     nfolds = 10
+    # for (r in 1:10) {
     mod_lasso = cva.glmnet(
         x_train,
         y_train,
@@ -95,7 +96,7 @@ PFLEXNET = function(x_train, x_test, y_train, y_test) {
                             c(0:(nrow(x_train)-1)),
                             -1.0,
                             0.05,
-                            10)
+                            1)
     b_pflexnet = mod_pflexnet[[1]]
     # print("####################################################")
     # print(paste0("length(b_pflexnet)=", sum(b_pflexnet != 0)))
@@ -118,7 +119,7 @@ PFLEXNET_L1 = function(x_train, x_test, y_train, y_test) {
                             c(0:(nrow(x_train)-1)),
                             1.0,
                             0.05,
-                            10)
+                            1)
     b_pflexnet = mod_pflexnet[[1]]
     # print("####################################################")
     # print(paste0("length(b_pflexnet)=", sum(b_pflexnet != 0)))
@@ -135,7 +136,7 @@ PFLEXNET_L2 = function(x_train, x_test, y_train, y_test) {
                             c(0:(nrow(x_train)-1)),
                             0.0,
                             0.05,
-                            10)
+                            1)
     b_pflexnet = mod_pflexnet[[1]]
     # print("####################################################")
     # print(paste0("length(b_pflexnet)=", sum(b_pflexnet != 0)))
@@ -268,13 +269,10 @@ fn_test = function() {
         maf = 1e-4
         h2 = 0.75
         X_sim = matrix(runif(n*p, min=maf, max=1-maf), nrow=n)
-        # X_sim = matrix(sample(c(0,1), size=n*p, replace=TRUE), nrow=n)
-        # X_sim = scale(X_sim, center=T, scale=T)
-
         b = rep(0, p)
         idx_b = sort(sample(c(1:p), q))
-        b[idx_b] = rnorm(q)
-        # b[idx_b] = abs(rnorm(q))
+        # b[idx_b] = rnorm(q)
+        b[idx_b] = abs(rnorm(q))
         # b[idx_b] = -abs(rnorm(q))
         xb = X_sim %*% b
         v_xb = var(xb)
@@ -283,61 +281,24 @@ fn_test = function() {
         y = xb + e
         y_sim = y
         # y_sim = scale(y, center=T, scale=T)[,1]
-        # y_sim = scale(y, center=T, scale=F)[,1]
-        # y_sim = 100 * (y_sim - min(y_sim)) / (max(y_sim) - min(y_sim))
 
-        # y_sim = 100 * (y - min(y)) / (max(y) - min(y))
-        # y_sim = 1 * (y - min(y)) / (max(y) - min(y))
-        # y_sim = y - mean(y)
-        # y_sim = y *100
-
-        # # ### Using Arabidopsis data
-        # # if (!require("BiocManager", quietly = TRUE))
-        # #     install.packages("BiocManager")# BiocManager::install("snpStats")
-        # # install.packages("PhenotypeSimulator")
-        # # random genetic variance: h2b 
-        # SIM = PhenotypeSimulator::runSimulation(N = 100, P = 1,  tNrSNP = 1000,
-        #                         SNPfrequencies = c(0.05, 0.1,0.3,0.4), 
-        #                         genVar = 0.4, h2bg = 1, phi = 1, 
-        #                         verbose = TRUE, nonlinear="exp", 
-        #                         proportionNonlinear = 0.0)
-        # # genVar = 0.6
-        # # noiseVar = 1 - genVar
-        # # totalSNPeffect = 0.01
-        # # h2s = totalSNPeffect/genVar
-        # # phi = 0.6 
-        # # rho = 0.1
-        # # delta = 0.3
-        # # shared = 0.8
-        # # independent = 1 - shared
-        # # SIM = PhenotypeSimulator::runSimulation(N = 100, P = 1, tNrSNP = 10000, SNPfrequencies = c(0.05, 0.1,0.3,0.4), 
-        # #     format = "oxgen", cNrSNP = 30, genVar = genVar, h2s = h2s, 
-        # #     phi = 0.6, delta = 0.3, distBetaGenetic = "unif", mBetaGenetic = 0.5, 
-        # #     sdBetaGenetic = 1, NrFixedEffects = 4, NrConfounders = c(1, 2, 1, 2),
-        # #     pIndependentConfounders = c(0, 1, 1, 0.5), 
-        # #     distConfounders = c("bin", "cat_norm", "cat_unif", "norm"), 
-        # #     probConfounders = 0.2, catConfounders = c(3, 4), pcorr = 0.8, 
-        # #     verbose = TRUE)
-        # y_sim = SIM$phenoComponentsFinal$Y[,1]
-        # X_sim = SIM$rawComponents$genotypes$genotypes 
-        # # b = t(X) %*% solve(X %*% t(X)) %*% y
-        # # y_hat = X %*% b
-        # # sum(y - y_hat)
-
-        # ### Usigng Athaliana data
-        # library(reticulate)
-        # np = import("numpy")
-        # # data reading
+        ### Using Arabidopsis data
+        library(reticulate)
+        np = import("numpy")
+        # data reading
         # X_sim = np$load("./res/flowering_time_10deg_ld_filtered_maf0.05_windowkb10_r20.8.npy")
         # y_sim = as.vector(np$load("./res/flowering_time_10degphenotype_values.npy"))
+        X_sim = np$load("./res/herbavore_resistance_G2P_ld_filtered_maf0.05_windowkb10_r20.8.npy")
+        y_sim = as.vector(np$load("./res/herbavore_resistance_G2Pphenotype_values.npy"))
+        idx_col = seq(1, ncol(X_sim), length=1e4)
 
         k = 10
-        r = 3
+        r = 1
 
         options(digits.secs=7)
         start_time = Sys.time()
-        # kfold_out = KFOLD_CV(x=X_sim, y=y_sim, k=k, r=r, print_time=TRUE)
-        kfold_out = KFOLD_CV(x=X_sim, y=y_sim, k=k, r=r, print_time=FALSE)
+        kfold_out = KFOLD_CV(x=X_sim[, idx], y=y_sim, k=k, r=r, print_time=TRUE)
+        # kfold_out = KFOLD_CV(x=X_sim, y=y_sim, k=k, r=r, print_time=FALSE)
         end_time = Sys.time()
         print(end_time - start_time)
 
@@ -360,7 +321,8 @@ fn_test = function() {
             plot_y_test = c(plot_y_test, p_y_test)
         }
         plot_df = data.frame(model=plot_model, y_hat=plot_y_hat, y_test=plot_y_test)
-        for (mod in unique(plot_df$model)) {    
+        for (mod in unique(plot_df$model)) {
+            # mod = unique(plot_df$model)[1]
             idx = plot_df$model == mod
             x = plot_df$y_test[idx]
             y = plot_df$y_hat[idx]

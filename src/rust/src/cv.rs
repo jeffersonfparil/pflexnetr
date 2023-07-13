@@ -260,26 +260,10 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
                 .and(&alpha_path)
                 .and(&lambda_path)
                 .par_for_each(|err, b, &alfa, &lambda| {
-                    // let idx_depenalised = varsel(b_hat.view(), alfa, lambda).unwrap();
-                    // let b_hat_new = if idx_depenalised.len() < x.ncols() {
-                    //     let b_hat_tmp: Array1<f64> = ols(x.view(), y.view(), &idx_training, &idx_depenalised).unwrap();
-                    //     let mut b_hat_new: Array1<f64> = Array1::from_elem(x.ncols(), 0.0);
-                    //     for i in 0..idx_depenalised.len() {
-                    //         let idx = idx_depenalised[i];
-                    //         b_hat_new[idx] = b_hat_tmp[i];
-                    //     }
-                    //     b_hat_new
-                    // } else {
-                    //     b_hat.clone()
-                    // };
                     let b_hat_new: Array1<f64> = expand_and_contract(&b_hat, alfa, lambda).unwrap();
                     *err = error_index(b_hat_new.view(), x, y, &idx_validation).unwrap();
                     *b = b_hat_new;
                 });
-            // println!("#########################################");
-            // println!("alpha_path={:?}", alpha_path);
-            // println!("lambda_path={:?}", lambda_path);
-            // println!("errors={:?}", errors);
             // Append performances, i.e. error index: f(1-cor, rmse, mae, etc...)
             for i in 0..a {
                 for j in 0..l {
@@ -288,20 +272,6 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
             }
         }
     }
-    // Find best alpha, lambda and beta on the full dataset
-    // let mean_error_across_reps_and_folds: Array2<f64> = performances
-    //     .mean_axis(Axis(0))
-    //     .unwrap()
-    //     .mean_axis(Axis(0))
-    //     .unwrap();
-    // println!("#########################################");
-    // println!("mean_error_across_reps_and_folds={:?}", mean_error_across_reps_and_folds);
-    // println!("mean_error_across_reps_and_folds.min()={:?}", mean_error_across_reps_and_folds.fold(mean_error_across_reps_and_folds[(0, 0)], |min, &x| if x<min{x}else{min}));
-    // let mean_alphas = mean_error_across_reps_and_folds.mean_axis(Axis(1)).unwrap();
-    // let mean_lambdas = mean_error_across_reps_and_folds.mean_axis(Axis(0)).unwrap();
-    // println!("mean_alphas={:?}", mean_alphas);
-    // println!("mean_lambdas={:?}", mean_lambdas);
-    /////////////////////////////////
     // Account for overfit cross-validation folds, i.e. filter them out, or just use mode of the lambda and alphas?
     let mut alpha_path_counts: Array1<usize> = Array1::from_elem(l, 0);
     let mut lambda_path_counts: Array1<usize> = Array1::from_elem(l, 0);
@@ -320,17 +290,10 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
                 }
             },
         );
-        // println!("#########################################");
-        // println!("performances.slice(s![rep, .., .., ..])={:?}", performances.slice(s![rep, 0, 0, 0]));
-        // println!("min_error={:?}", min_error);
-        // println!("mean_error_per_rep_across_folds={:?}", mean_error_per_rep_across_folds);
-        // println!("alpha_path_counts={:?}", alpha_path_counts);
-        // println!("lambda_path_counts={:?}", lambda_path_counts);
         let ((idx_0, idx_1), _) = mean_error_per_rep_across_folds
             .indexed_iter()
             .find(|((_i, _j), &x)| x == min_error)
             .unwrap();
-        // println!("lambda_path[(idx_0, idx_1)]={:?}", lambda_path[(idx_0, idx_1)]);
         for a in 0..l {
             if alpha_path[(idx_0, idx_1)] == parameters_path[a] {
                 alpha_path_counts[a] += 1;
@@ -340,9 +303,6 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
             }
         }
     }
-    // println!("#########################################");
-    // println!("alpha_path_counts={:?}", alpha_path_counts);
-    // println!("lambda_path_counts={:?}", lambda_path_counts);
     // Find the mode alpha and lambda
     let alpha_max_count = alpha_path_counts.fold(0, |max, &x| if x > max { x } else { max });
     let (alpha_idx, _) = alpha_path_counts
