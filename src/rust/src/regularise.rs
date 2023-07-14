@@ -9,49 +9,39 @@ pub fn expand_and_contract(
 ) -> io::Result<Array1<f64>> {
     let intercept = b_hat[0];
     let p = b_hat.len();
-    // Norm 1 or norm 2 (exclude the intercept)
-    let mut normed1: Array1<f64> = Array1::from_elem(p-1, f64::NAN);
-    let mut normed2: Array1<f64> = Array1::from_elem(p-1, f64::NAN);
-    let mut normed: Array1<f64> = Array1::from_elem(p-1, f64::NAN);
-    let mut b_hat_new: Array1<f64> = Array1::from_elem(p-1, f64::NAN); // excluding the intercept
-    Zip::from(&mut normed1)
-        .and(&mut normed2)
-        .and(&mut normed)
-        .and(&mut b_hat_new)
-        .and(&b_hat.slice(s![1..p]))
-        .par_for_each(|n1, n2, n, b_new, &b| {
-            *n1 = b.abs();
-            *n2 = b.powf(2.0);
-            *n = ((1.00 - alpha) * *n2) + (alpha * *n1);
-            *b_new = b;
-        });
+    // Norm 1 or norm 2 (exclude the intercept) and 
     // Find estimates that will be penalised using the proxy b_hat norms
-    let normed_min = normed.view().min();
-    let normed_max = normed.view().max();
+    let mut normed: Array1<f64> = Array1::from_elem(p-1, f64::NAN);
+    let b_min = b_hat.slice(s![1..p]).min();
+    let b_max = b_hat.slice(s![1..p]).max();
+    let normed_min = ((1.00 - alpha) * b_min.powf(2.0)) + (alpha * b_min.abs());
+    let normed_max = ((1.00 - alpha) * b_max.powf(2.0)) + (alpha * b_max.abs());
     let mut subtracted_penalised: Array1<f64> = Array1::from_elem(p-1, 0.0);
     let mut added_penalised: Array1<f64> = Array1::from_elem(p-1, 0.0);
     let mut subtracted_depenalised: Array1<f64> = Array1::from_elem(p-1, 0.0);
     let mut added_depenalised: Array1<f64> = Array1::from_elem(p-1, 0.0);
-    Zip::from(&mut b_hat_new)
+    let mut b_hat_new: Array1<f64> = b_hat.slice(s![1..p]).to_owned(); // excluding the intercept
+    Zip::from(&mut normed)
         .and(&mut subtracted_penalised)
         .and(&mut added_penalised)
         .and(&mut subtracted_depenalised)
         .and(&mut added_depenalised)
-        .and(&normed)
-        .par_for_each(|b, sp, ap, sd, ad, &n| {
-            let s = (n - normed_min) / (normed_max - normed_min);
+        .and(&mut b_hat_new)
+        .par_for_each(|n, sp, ap, sd, ad, b| {
+            *n = ((1.00 - alpha) * b.powf(2.0)) + (alpha * b.abs());
+            let s = (*n - normed_min) / (normed_max - normed_min);
             if s < lambda {
                 if *b >= 0.0 {
-                    *sp = n;
+                    *sp = *n;
                 } else {
-                    *ap = n;
+                    *ap = *n;
                 }
-                *b = b.signum() * vec![(b.abs() - n), 0.0].max();
+                *b = b.signum() * vec![(b.abs() - *n), 0.0].max();
             } else {
                 if *b >= 0.0 {
-                    *sd = n;
+                    *sd = *n;
                 } else {
-                    *ad = n;
+                    *ad = *n;
                 }
             }
         });

@@ -178,19 +178,19 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
 ) -> io::Result<(Array1<f64>, f64, f64)> {
     let (_n, _p) = (row_idx.len(), x.ncols());
     let max_usize: usize = (1.0 / lambda_step_size).round() as usize;
-    let parameters_path: Array1<f64> = (0..(max_usize + 1))
-        .into_iter()
-        .rev() // maybe moving this way we can be more blazingly fast?
-        .map(|x| (x as f64) / (max_usize as f64))
-        .collect();
-
+    // let parameters_path: Array1<f64> = (0..(max_usize + 1))
+    //     .into_iter()
+    //     .rev() // maybe moving this way we can be more blazingly fast?
+    //     .map(|x| (x as f64) / (max_usize as f64))
+    //     .collect();
     // let parameters_path: Array1<f64> = Array1::from_shape_vec(38,
     //         vec![0.0, 0.01, 0.2, 0.3, 0.4, 0.5,
     //                 0.6, 0.7, 0.8, 0.9,
     //                 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99,
     //                 0.991, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999,
     //                 0.999991, 0.999992, 0.999993, 0.999994, 0.999995, 0.999996, 0.999997, 0.999998, 0.999999, 1.0]).unwrap();
-
+    let parameters_path: Array1<f64> = Array1::from_shape_vec(6,
+                        vec![0.5, 0.6, 0.7, 0.8, 0.9, 1.0]).unwrap();
     let l = parameters_path.len();
     // If alpha < 0.0 then optimise for alpha in addtion to lambda, else use the user-secified alpha for ridge, lasso or somewhere in between
     let (alpha_path, a): (Array2<f64>, usize) = if alpha >= 0.0 {

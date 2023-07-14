@@ -81,16 +81,19 @@ ELASTIC = function(x_train, x_test, y_train, y_test) {
 
 rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
 PFLEXNET = function(x_train, x_test, y_train, y_test) {
-    ### Destandardise
-    standardise = ((abs(1-sd(c(y_train, y_test)))< 0.1) & (abs(mean(c(y_train, y_test))) < 0.1))
-    if (standardise == TRUE) {
-        sigma = 2.00 * sd(c(y_train, y_test))
-        mu = 2.00 * sigma
-        y_train = (y_train * sigma) + mu
-        # x_train = (x_train * sigma) + mu
-        y_test = (y_test * sigma) + mu
-        # x_test = (x_test * sigma) + mu
-    }
+    # ### Destandardise
+    # # standardise = ((abs(1-sd(c(y_train, y_test)))< 0.1) & (abs(mean(c(y_train, y_test))) < 0.1))
+    # standardise = TRUE
+    # if (standardise == TRUE) {
+    #     # sigma = 2.00 * sd(c(y_train, y_test))
+    #     # mu = 2.00 * sigma
+    #     # y_train = (y_train * sigma) + mu
+    #     # # x_train = (x_train * sigma) + mu
+    #     # y_test = (y_test * sigma) + mu
+    #     # # x_test = (x_test * sigma) + mu
+    #     y_train = exp(y_train)
+    #     y_test = exp(y_test)
+    # }
     mod_pflexnet = pflexnet(cbind(rep(1,nrow(x_train)), x_train),
                             y_train,
                             c(0:(nrow(x_train)-1)),
@@ -104,12 +107,15 @@ PFLEXNET = function(x_train, x_test, y_train, y_test) {
     alpha_pflexnet = mod_pflexnet[[2]]
     lambda_pflexnet = mod_pflexnet[[3]]
     y_hat = cbind(rep(1,nrow(x_test)), x_test) %*% b_pflexnet
-    ### Restandardise
-    if (standardise == TRUE) {
-        y_train = (y_train-mu)/sigma
-        y_test = (y_test-mu)/sigma
-        y_hat = (y_hat-mu)/sigma
-     }
+    # ### Restandardise
+    # if (standardise == TRUE) {
+    #     # y_train = (y_train-mu)/sigma
+    #     # y_test = (y_test-mu)/sigma
+    #     # y_hat = (y_hat-mu)/sigma
+    #     y_train = log(y_train)
+    #     y_test = log(y_test)
+    #     y_hat = log(y_hat)
+    #  }
     return(PERF(y_test, y_hat))
 }
 
@@ -250,11 +256,10 @@ KFOLD_CV = function(x, y, r=10, k=10, print_time=FALSE) {
 ### UNIT TESTS ###
 ##################
 # rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
-fn_test = function() {
+fn_test = function(vec_nQTLs=c(2, 20), print_time=TRUE) {
     out = data.frame()
     set.seed(123)
-    # for (q in c(1, 2, 3, 4, 5, 10, 50, 100, 500)) {
-    for (q in c(2, 20)) {
+    for (q in vec_nQTLs) {
         # q = 2
         print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         print(paste0("q=", q))
@@ -265,7 +270,7 @@ fn_test = function() {
         vec_rmse = c()
         vec_mbe = c()
         n = 100
-        p = 1e5
+        p = 1e4
         maf = 1e-4
         h2 = 0.75
         X_sim = matrix(runif(n*p, min=maf, max=1-maf), nrow=n)
@@ -282,23 +287,23 @@ fn_test = function() {
         y_sim = y
         # y_sim = scale(y, center=T, scale=T)[,1]
 
-        ### Using Arabidopsis data
-        library(reticulate)
-        np = import("numpy")
-        # data reading
-        # X_sim = np$load("./res/flowering_time_10deg_ld_filtered_maf0.05_windowkb10_r20.8.npy")
-        # y_sim = as.vector(np$load("./res/flowering_time_10degphenotype_values.npy"))
-        X_sim = np$load("./res/herbavore_resistance_G2P_ld_filtered_maf0.05_windowkb10_r20.8.npy")
-        y_sim = as.vector(np$load("./res/herbavore_resistance_G2Pphenotype_values.npy"))
-        idx_col = seq(1, ncol(X_sim), length=1e4)
+        # ### Using Arabidopsis data
+        # library(reticulate)
+        # np = import("numpy")
+        # # data reading
+        # # X_sim = np$load("./res/flowering_time_10deg_ld_filtered_maf0.05_windowkb10_r20.8.npy")
+        # # y_sim = as.vector(np$load("./res/flowering_time_10degphenotype_values.npy"))
+        # X_sim = np$load("./res/herbavore_resistance_G2P_ld_filtered_maf0.05_windowkb10_r20.8.npy")
+        # y_sim = as.vector(np$load("./res/herbavore_resistance_G2Pphenotype_values.npy"))
+        # idx_col = seq(1, ncol(X_sim), length=1e4)
 
         k = 10
         r = 1
 
         options(digits.secs=7)
         start_time = Sys.time()
-        kfold_out = KFOLD_CV(x=X_sim[, idx], y=y_sim, k=k, r=r, print_time=TRUE)
-        # kfold_out = KFOLD_CV(x=X_sim, y=y_sim, k=k, r=r, print_time=FALSE)
+        # kfold_out = KFOLD_CV(x=X_sim[, idx], y=y_sim, k=k, r=r, print_time=print_time)
+        kfold_out = KFOLD_CV(x=X_sim, y=y_sim, k=k, r=r, print_time=print_time)
         end_time = Sys.time()
         print(end_time - start_time)
 
@@ -349,11 +354,10 @@ fn_test = function() {
             out = rbind(out, df_out)
         }
     }
-    print(out)
-    aggregate(correlation ~ model, data=out, FUN=mean)
-    aggregate(rmse ~ model, data=out, FUN=mean)
-    # aggregate(mbe ~ model, data=out, FUN=mean)
+    print(aggregate(correlation ~ model, data=out, FUN=mean))
+    print(aggregate(rmse ~ model, data=out, FUN=mean))
+    return(out)
 }
 
-# fn_test()
+# out = fn_test()
 
