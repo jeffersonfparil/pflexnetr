@@ -12,8 +12,8 @@ pub fn expand_and_contract(
     // Norm 1 or norm 2 (exclude the intercept) and 
     // Find estimates that will be penalised using the proxy b_hat norms
     let mut normed: Array1<f64> = Array1::from_elem(p-1, f64::NAN);
-    let b_min = b_hat.slice(s![1..p]).min();
-    let b_max = b_hat.slice(s![1..p]).max();
+    let b_min = b_hat.slice(s![1..p]).map(|b| b.abs()).min();
+    let b_max = b_hat.slice(s![1..p]).map(|b| b.abs()).max();
     let normed_min = ((1.00 - alpha) * b_min.powf(2.0)) + (alpha * b_min.abs());
     let normed_max = ((1.00 - alpha) * b_max.powf(2.0)) + (alpha * b_max.abs());
     let mut subtracted_penalised: Array1<f64> = Array1::from_elem(p-1, 0.0);
