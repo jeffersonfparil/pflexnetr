@@ -54,10 +54,12 @@ test_that("pflexnetr", {
 
         expect_equal(cor(y_test, y_hat), 0.8776987, tolerance=1e-7)
 
+
+
+        print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         seed = 42069
         set.seed(seed)
         q = 20
-        print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         print(paste0("q=", q))
         vec_q = c()
         vec_y_scaled = c()
@@ -94,7 +96,7 @@ test_that("pflexnetr", {
         out = pflexnet(x=cbind(rep(1,nrow(x_train)), x_train),
                         y=y_train,
                         row_idx=c(0:(nrow(x_train)-1)),
-                        alpha=-1.0,
+                        alpha=1.0,
                         lambda_step_size=0.1,
                         r=1)
 

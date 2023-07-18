@@ -54,7 +54,7 @@ RIDGE = function(x_train, x_test, y_train, y_test) {
 }
 
 ELASTIC = function(x_train, x_test, y_train, y_test) {
-    cores = parallel::makeCluster(detectCores())
+    cores = parallel::makeCluster(detectCores()-1)
     nfolds = 10
     vec_alphas = sort(unique(c(seq(0, 1, len=11)^3, 1-seq(0, 1, len=11)^3)))
     mod_elastic = cva.glmnet(
@@ -66,6 +66,7 @@ ELASTIC = function(x_train, x_test, y_train, y_test) {
         outerParallel = cores,
         checkInnerParallel = TRUE
         )
+    stopCluster(cores)    
     vec_mse = c()
     for (i in (1:length(vec_alphas))) {
         # i = 1
@@ -256,7 +257,7 @@ KFOLD_CV = function(x, y, r=10, k=10, print_time=FALSE) {
 ### UNIT TESTS ###
 ##################
 # rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
-fn_test = function(vec_nQTLs=c(2, 20), print_time=TRUE) {
+fn_test = function(vec_nQTLs=c(1,2,3,4,52,10,20,100), print_time=TRUE) {
     out = data.frame()
     set.seed(123)
     for (q in vec_nQTLs) {
@@ -269,15 +270,15 @@ fn_test = function(vec_nQTLs=c(2, 20), print_time=TRUE) {
         vec_cor = c()
         vec_rmse = c()
         vec_mbe = c()
-        n = 100
-        p = 1e4
+        n = 1e2
+        p = 1e3
         maf = 1e-4
         h2 = 0.75
         X_sim = matrix(runif(n*p, min=maf, max=1-maf), nrow=n)
         b = rep(0, p)
         idx_b = sort(sample(c(1:p), q))
-        # b[idx_b] = rnorm(q)
-        b[idx_b] = abs(rnorm(q))
+        b[idx_b] = rnorm(q)
+        # b[idx_b] = abs(rnorm(q))
         # b[idx_b] = -abs(rnorm(q))
         xb = X_sim %*% b
         v_xb = var(xb)
@@ -336,11 +337,11 @@ fn_test = function(vec_nQTLs=c(2, 20), print_time=TRUE) {
             vec_cor = c(vec_cor, round(100*cor(x, y),2))
             vec_rmse = c(vec_rmse, sqrt(mean((x-y)^2)))
             vec_mbe = c(vec_mbe, mean(x-y))
-            svg(paste0(mod, "-q", q, "-gp.svg"))
-            plot(x=x, y=y, xlab="Observed", ylab="Predicted", pch=19, main=mod); grid()
-            legend("topright", legend=c(paste0("cor = ", round(100*cor(x=x, y=y),2), "%"),
-                                        paste0("rmse = ", round(sqrt(mean((x-y)^2)),7))))
-            dev.off()
+            # svg(paste0(mod, "-q", q, "-gp.svg"))
+            # plot(x=x, y=y, xlab="Observed", ylab="Predicted", pch=19, main=mod); grid()
+            # legend("topright", legend=c(paste0("cor = ", round(100*cor(x=x, y=y),2), "%"),
+                                        # paste0("rmse = ", round(sqrt(mean((x-y)^2)),7))))
+            # dev.off()
         }
         df_out = data.frame(q=vec_q, model=vec_mod, correlation=vec_cor, rmse=vec_rmse, mbe=vec_mbe,
                             b_mean=mean(b[idx_b]),
@@ -353,11 +354,12 @@ fn_test = function(vec_nQTLs=c(2, 20), print_time=TRUE) {
         } else {
             out = rbind(out, df_out)
         }
+        print(out)
     }
     print(aggregate(correlation ~ model, data=out, FUN=mean))
     print(aggregate(rmse ~ model, data=out, FUN=mean))
     return(out)
 }
 
-# out = fn_test()
+out = fn_test()
 
