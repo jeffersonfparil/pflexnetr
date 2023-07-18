@@ -1,7 +1,7 @@
 library(glmnetUtils)
 library(parallel)
 
-PERF = function(y_test, y_hat) {
+PERF = function(y_test, y_hat, b_hat) {
     n = length(y_test)
     if ((var(y_hat)==0) | (var(y_test)==0)) {
         cor = 0.0
@@ -13,13 +13,20 @@ PERF = function(y_test, y_hat) {
     mae = ( sum(abs(e))/n )
     mse = ( sum(e^2)/n )
     rmse = ( sqrt(sum(e^2)/n) )
-    return(list(cor=cor, mbe=mbe, mae=mae, mse=mse, rmse=rmse, y_hat=y_hat, y_test=y_test))
+    b_n_nonzero = sum(abs(b_hat) > 1e7)
+    b_mean = mean(b_hat)
+    b_median = median(b_hat)
+    b_min = min(b_hat)
+    b_max = max(b_hat)
+    return(list(cor=cor, mbe=mbe, mae=mae, mse=mse, rmse=rmse,
+                y_hat=y_hat, y_test=y_test,
+                b_n_nonzero=b_n_nonzero, b_mean=b_mean, b_median=b_median, b_min=b_min, b_max=b_max))
 }
 
 OLS = function(x_train, x_test, y_train, y_test) {
     b_hat = t(x_train) %*% solve(x_train %*% t(x_train)) %*% y_train
     y_hat = (x_test %*% b_hat)[,1]
-    return(PERF(y_test, y_hat))
+    return(PERF(y_test, y_hat, b_hat))
 }
 
 LASSO = function(x_train, x_test, y_train, y_test) {
@@ -35,12 +42,13 @@ LASSO = function(x_train, x_test, y_train, y_test) {
         checkInnerParallel = TRUE
         )
     y_hat = predict(mod_lasso$modlist[[1]], newx=x_test, s="lambda.min")[,1]
-    return(PERF(y_test, y_hat))
+    b_hat = coef(mod_lasso$modlist[[1]])[,1]
+    return(PERF(y_test, y_hat, b_hat))
 }
 
 RIDGE = function(x_train, x_test, y_train, y_test) {
     nfolds = 10
-    mod_lasso = cva.glmnet(
+    mod_ridge = cva.glmnet(
         x_train,
         y_train,
         alpha = 0.0,
@@ -49,8 +57,9 @@ RIDGE = function(x_train, x_test, y_train, y_test) {
         outerParallel = NULL,
         checkInnerParallel = TRUE
         )
-    y_hat = predict(mod_lasso$modlist[[1]], newx=x_test, s="lambda.min")[,1]
-    return(PERF(y_test, y_hat))
+    y_hat = predict(mod_ridge$modlist[[1]], newx=x_test, s="lambda.min")[,1]
+    b_hat = coef(mod_ridge$modlist[[1]])[,1]
+    return(PERF(y_test, y_hat, b_hat))
 }
 
 ELASTIC = function(x_train, x_test, y_train, y_test) {
@@ -72,12 +81,14 @@ ELASTIC = function(x_train, x_test, y_train, y_test) {
         # i = 1
         mod = mod_elastic$modlist[[i]]
         y_hat = predict(mod, newx=x_test, s="lambda.min")[,1]
-        vec_mse = c(vec_mse, PERF(y_test, y_hat)$mse)
+        b_hat = coef(mod)[,1]
+        vec_mse = c(vec_mse, PERF(y_test, y_hat, b_hat)$mse)
     }
     cbind(vec_alphas, vec_mse)
     idx = which(vec_mse==min(vec_mse, na.rm=TRUE))
     y_hat = predict(mod_elastic$modlist[[idx]], newx=x_test, s="lambda.min")[,1]
-    return(PERF(y_test, y_hat))
+    b_hat = coef(mod_elastic$modlist[[idx]])[,1]
+    return(PERF(y_test, y_hat, b_hat))
 }
 
 rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
@@ -117,7 +128,7 @@ PFLEXNET = function(x_train, x_test, y_train, y_test) {
     #     y_test = log(y_test)
     #     y_hat = log(y_hat)
     #  }
-    return(PERF(y_test, y_hat))
+    return(PERF(y_test, y_hat, b_pflexnet))
 }
 
 PFLEXNET_L1 = function(x_train, x_test, y_train, y_test) {
@@ -134,7 +145,7 @@ PFLEXNET_L1 = function(x_train, x_test, y_train, y_test) {
     alpha_pflexnet = mod_pflexnet[[2]]
     lambda_pflexnet = mod_pflexnet[[3]]
     y_hat = cbind(rep(1,nrow(x_test)), x_test) %*% b_pflexnet
-    return(PERF(y_test, y_hat))
+    return(PERF(y_test, y_hat, b_pflexnet))
 }
 
 PFLEXNET_L2 = function(x_train, x_test, y_train, y_test) {
@@ -151,7 +162,7 @@ PFLEXNET_L2 = function(x_train, x_test, y_train, y_test) {
     alpha_pflexnet = mod_pflexnet[[2]]
     lambda_pflexnet = mod_pflexnet[[3]]
     y_hat = cbind(rep(1,nrow(x_test)), x_test) %*% b_pflexnet
-    return(PERF(y_test, y_hat))
+    return(PERF(y_test, y_hat, b_pflexnet))
 }
 
 KFOLD_CV = function(x, y, r=10, k=10, print_time=FALSE) {
@@ -257,7 +268,9 @@ KFOLD_CV = function(x, y, r=10, k=10, print_time=FALSE) {
 ### UNIT TESTS ###
 ##################
 # rextendr::document(pkg="/data-weedomics-1/pflexnetr"); devtools::load_all("/data-weedomics-1/pflexnetr")
-fn_test = function(vec_nQTLs=c(1,2,3,4,52,10,20,100), print_time=TRUE) {
+fn_test = function(vec_nQTLs=c(1,2,3,4,5,10,20,100), print_time=TRUE) {
+    # vec_nQTLs=c(1,2,3,4,5,10,20,100)
+    # print_time=TRUE
     out = data.frame()
     set.seed(123)
     for (q in vec_nQTLs) {
@@ -274,11 +287,12 @@ fn_test = function(vec_nQTLs=c(1,2,3,4,52,10,20,100), print_time=TRUE) {
         p = 1e3
         maf = 1e-4
         h2 = 0.75
-        X_sim = matrix(runif(n*p, min=maf, max=1-maf), nrow=n)
+        # X_sim = matrix(runif(n*p, min=maf, max=1-maf), nrow=n)
+        X_sim = matrix(sample(c(0, 1), size=n*p, replace=TRUE), nrow=n)
         b = rep(0, p)
         idx_b = sort(sample(c(1:p), q))
-        b[idx_b] = rnorm(q)
-        # b[idx_b] = abs(rnorm(q))
+        # b[idx_b] = rnorm(q)
+        b[idx_b] = abs(rnorm(q))
         # b[idx_b] = -abs(rnorm(q))
         xb = X_sim %*% b
         v_xb = var(xb)
@@ -295,15 +309,14 @@ fn_test = function(vec_nQTLs=c(1,2,3,4,52,10,20,100), print_time=TRUE) {
         # # X_sim = np$load("./res/flowering_time_10deg_ld_filtered_maf0.05_windowkb10_r20.8.npy")
         # # y_sim = as.vector(np$load("./res/flowering_time_10degphenotype_values.npy"))
         # X_sim = np$load("./res/herbavore_resistance_G2P_ld_filtered_maf0.05_windowkb10_r20.8.npy")
+        # X_sim = X_sim[, seq(1, ncol(X_sim), length=1e4)]
         # y_sim = as.vector(np$load("./res/herbavore_resistance_G2Pphenotype_values.npy"))
-        # idx_col = seq(1, ncol(X_sim), length=1e4)
 
         k = 10
         r = 1
 
         options(digits.secs=7)
         start_time = Sys.time()
-        # kfold_out = KFOLD_CV(x=X_sim[, idx], y=y_sim, k=k, r=r, print_time=print_time)
         kfold_out = KFOLD_CV(x=X_sim, y=y_sim, k=k, r=r, print_time=print_time)
         end_time = Sys.time()
         print(end_time - start_time)
@@ -361,5 +374,5 @@ fn_test = function(vec_nQTLs=c(1,2,3,4,52,10,20,100), print_time=TRUE) {
     return(out)
 }
 
-out = fn_test()
+out = fn_test(vec_nQTLs=c(2,10))
 

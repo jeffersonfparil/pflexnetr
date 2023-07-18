@@ -1,5 +1,5 @@
 use ndarray::{prelude::*, Zip};
-use ndarray_linalg::{eig::*, least_squares::*, svd::*};
+use ndarray_linalg::{eig::*, least_squares::*, svd::*, Inverse};
 use std::io::{self, Error, ErrorKind};
 
 #[allow(dead_code)]
@@ -163,6 +163,7 @@ pub fn ols(
                 pinv(
                     multiply_views_xxt(x, x, row_idx, col_idx, row_idx, col_idx)
                         .unwrap()
+                        // .inv()
                         .view(),
                 )
                 .unwrap()
@@ -187,6 +188,7 @@ pub fn ols(
                 pinv(
                     multiply_views_xtx(x, x, row_idx, col_idx, row_idx, col_idx)
                         .unwrap()
+                        // .inv()
                         .view(),
                 )
                 .unwrap()
