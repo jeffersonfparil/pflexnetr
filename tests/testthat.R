@@ -17,7 +17,7 @@ test_that("pflexnetr", {
         p = 1000
         q = 2
         maf = 1e-4
-        h2 = 0.9
+        h2 = 0.75
         X_sim = matrix(runif(n*p, min=maf, max=1-maf), nrow=n)
         b = rep(0, p)
         idx_b = sort(sample(c(1:p), q))
@@ -28,6 +28,7 @@ test_that("pflexnetr", {
         e = rnorm(n, mean=0, sd=sqrt(v_e))
         y = xb + e
         y_sim = scale(y, center=T, scale=T)[,1]
+        # y_sim = y
         x_train = X_sim[1:90, ]
         y_train = y_sim[1:90]
         x_test = X_sim[91:100, ]
@@ -35,8 +36,8 @@ test_that("pflexnetr", {
         out = pflexnet(x=cbind(rep(1,nrow(x_train)), x_train),
                         y=y_train,
                         row_idx=c(0:(nrow(x_train)-1)),
-                        alpha=-1.0,
-                        lambda_step_size=0.1,
+                        alpha=-1,
+                        lambda_step_size=0.05,
                         r=1)
         beta = out[[1]]
         alpha = out[[2]]
@@ -119,3 +120,31 @@ test_that("pflexnetr", {
 
     }
 )
+
+
+### More tests
+y = rnorm(5)
+X = cbind(rep(1, 5), matrix(rnorm(10), ncol=2))
+b0 = solve(t(X) %*% X) %*% t(X) %*% y
+
+y0 = X %*% b0
+y - y0
+
+
+x1 = cbind(rep(1, 5), X[,2])
+x2 = cbind(rep(1, 5), X[,3])
+
+b1 = solve(t(x1) %*% x1) %*% t(x1) %*% y
+b2 = solve(t(x2) %*% x2) %*% t(x2) %*% y
+
+(b1 + b2) / 2
+b1 + b2
+
+bh = c(mean(c(b1[1], b2[1])), b1[2], b2[2])
+yh = X %*% bh
+
+y - yh
+
+
+print(sum((y - y0)^2))
+print(sum((y - yh)^2))

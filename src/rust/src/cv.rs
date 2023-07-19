@@ -179,50 +179,48 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
 ) -> io::Result<(Array1<f64>, f64, f64)> {
     let (_n, _p) = (row_idx.len(), x.ncols());
     let max_usize: usize = (1.0 / lambda_step_size).round() as usize;
-    let parameters_path: Array1<f64> = (0..(max_usize + 1))
+
+    let parameters_path_alpha: Array1<f64> = if alpha < 0.0 {
+        (0..(max_usize + 1))
+        .into_iter()
+        .rev() // maybe moving this way we can be more blazingly fast?
+        .map(|x| (x as f64) / (max_usize as f64))
+        .collect()
+    } else {
+        Array1::from_elem(1, alpha)
+    };
+    
+    let parameters_path_lambda: Array1<f64> = (0..(max_usize + 1))
         .into_iter()
         .rev() // maybe moving this way we can be more blazingly fast?
         .map(|x| (x as f64) / (max_usize as f64))
         .collect();
-    // let parameters_path: Array1<f64> = Array1::from_shape_vec(38,
-    //         vec![0.0, 0.01, 0.2, 0.3, 0.4, 0.5,
-    //                 0.6, 0.7, 0.8, 0.9,
-    //                 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99,
-    //                 0.991, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999,
-    //                 0.999991, 0.999992, 0.999993, 0.999994, 0.999995, 0.999996, 0.999997, 0.999998, 0.999999, 1.0]).unwrap();
-    // let parameters_path: Array1<f64> = Array1::from_shape_vec(6,
-    //                     vec![0.5, 0.6, 0.7, 0.8, 0.9, 1.0]).unwrap();
-    let l = parameters_path.len();
+    let a = parameters_path_alpha.len();
+    let l = parameters_path_lambda.len();
     // If alpha < 0.0 then optimise for alpha in addtion to lambda, else use the user-secified alpha for ridge, lasso or somewhere in between
-    let (alpha_path, a): (Array2<f64>, usize) = if alpha >= 0.0 {
-        // ridge or lasso optimise for lambda only
-        (
-            Array2::from_shape_vec((1, l), std::iter::repeat(alpha).take(l).collect()).unwrap(),
-            1,
-        )
-    } else {
-        // glmnet optimise for both alpha and lambda
-        (
-            Array2::from_shape_vec(
-                (l, l),
-                parameters_path
+    let alpha_path: Array2<f64> = Array2::from_shape_vec(
+                (a, l),
+                parameters_path_alpha
                     .clone()
                     .iter()
                     .flat_map(|&x| std::iter::repeat(x).take(l))
                     .collect(),
             )
-            .unwrap(),
-            l,
-        )
-    };
+            .unwrap();
     let lambda_path: Array2<f64> = Array2::from_shape_vec(
         (a, l),
-        std::iter::repeat(parameters_path.clone())
+        std::iter::repeat(parameters_path_lambda.clone())
             .take(a)
             .flat_map(|x| x)
             .collect(),
     )
     .unwrap();
+
+    println!("parameters_path_alpha={:?}", parameters_path_alpha);
+    println!("parameters_path_lambda={:?}", parameters_path_lambda);
+
+    println!("alpha_path={:?}", alpha_path);
+    println!("lambda_path={:?}", lambda_path);
 
     // Using a random number generator from the caller function to allow runs to be exactly repeatable in the same machine
     // This enables the optimisation for alpha to work predictable well and better than either ridge-like or lasso-like, i.e. alpha=0 and alpha=1 when q is between monogenic and polygenic
@@ -273,65 +271,67 @@ pub fn penalised_lambda_path_with_k_fold_cross_validation(
             }
         }
     }
-    // // Account for overfit cross-validation folds, i.e. filter them out, or just use mode of the lambda and alphas?
-    // let mut alpha_path_counts: Array1<usize> = Array1::from_elem(l, 0);
-    // let mut lambda_path_counts: Array1<usize> = Array1::from_elem(l, 0);
-    // for rep in 0..r {
-    //     let mean_error_per_rep_across_folds: Array2<f64> = performances
-    //         .slice(s![rep, .., .., ..])
-    //         .mean_axis(Axis(0))
-    //         .unwrap();
-    //     let min_error = mean_error_per_rep_across_folds.fold(
-    //         mean_error_per_rep_across_folds[(0, 0)],
-    //         |min, &x| {
-    //             if x < min {
-    //                 x
-    //             } else {
-    //                 min
-    //             }
-    //         },
-    //     );
-    //     let ((idx_0, idx_1), _) = mean_error_per_rep_across_folds
-    //         .indexed_iter()
-    //         .find(|((_i, _j), &x)| x == min_error)
-    //         .unwrap();
-    //     for a in 0..l {
-    //         if alpha_path[(idx_0, idx_1)] == parameters_path[a] {
-    //             alpha_path_counts[a] += 1;
-    //         }
-    //         if lambda_path[(idx_0, idx_1)] == parameters_path[a] {
-    //             lambda_path_counts[a] += 1;
-    //         }
-    //     }
-    // }
-    // // Find the mode alpha and lambda
-    // let alpha_max_count = alpha_path_counts.fold(0, |max, &x| if x > max { x } else { max });
-    // let (alpha_idx, _) = alpha_path_counts
-    //     .indexed_iter()
-    //     .find(|(_a, &x)| x == alpha_max_count)
-    //     .unwrap();
-    // let lambda_max_count = lambda_path_counts.fold(0, |max, &x| if x > max { x } else { max });
-    // let (lambda_idx, _) = lambda_path_counts
-    //     .indexed_iter()
-    //     .find(|(_a, &x)| x == lambda_max_count)
-    //     .unwrap();
-    // let alpha = parameters_path[alpha_idx];
-    // let lambda = parameters_path[lambda_idx];
-    // ///////////////////////////////////
-    // Equivalent to just simply finding the minimum - for n=100; p=1000; and q={2, 10}
-    let mean_error_per_rep_across_folds = performances
-        .mean_axis(Axis(0))
-        .unwrap()
-        .mean_axis(Axis(0))
+    // Account for overfit cross-validation folds, i.e. filter them out, or just use mode of the lambda and alphas?
+    let mut alpha_path_counts: Array1<usize> = Array1::from_elem(l, 0);
+    let mut lambda_path_counts: Array1<usize> = Array1::from_elem(l, 0);
+    for rep in 0..r {
+        let mean_error_per_rep_across_folds: Array2<f64> = performances
+            .slice(s![rep, .., .., ..])
+            .mean_axis(Axis(0))
+            .unwrap();
+        let min_error = mean_error_per_rep_across_folds.fold(
+            mean_error_per_rep_across_folds[(0, 0)],
+            |min, &x| {
+                if x < min {
+                    x
+                } else {
+                    min
+                }
+            },
+        );
+        let ((idx_0, idx_1), _) = mean_error_per_rep_across_folds
+            .indexed_iter()
+            .find(|((_i, _j), &x)| x == min_error)
+            .unwrap();
+        for i in 0..a {
+            if alpha_path[(idx_0, idx_1)] == parameters_path_alpha[i] {
+                alpha_path_counts[i] += 1;
+            }
+        }
+        for i in 0..l {
+            if lambda_path[(idx_0, idx_1)] == parameters_path_lambda[i] {
+                lambda_path_counts[i] += 1;
+            }
+        }
+    }
+    // Find the mode alpha and lambda
+    let alpha_max_count = alpha_path_counts.fold(0, |max, &x| if x > max { x } else { max });
+    let (alpha_idx, _) = alpha_path_counts
+        .indexed_iter()
+        .find(|(_a, &x)| x == alpha_max_count)
         .unwrap();
-    let min_error = mean_error_per_rep_across_folds.view().min();
-    let ((alpha_idx, lambda_idx), _) = mean_error_per_rep_across_folds
-                .indexed_iter()
-                .find(|((_i, _j), &x)| x == min_error)
-                .unwrap();
-    let alpha = parameters_path[alpha_idx];
-    let lambda = parameters_path[lambda_idx];
+    let lambda_max_count = lambda_path_counts.fold(0, |max, &x| if x > max { x } else { max });
+    let (lambda_idx, _) = lambda_path_counts
+        .indexed_iter()
+        .find(|(_a, &x)| x == lambda_max_count)
+        .unwrap();
+    let alpha = parameters_path_alpha[alpha_idx];
+    let lambda = parameters_path_lambda[lambda_idx];
     ///////////////////////////////////
+    // // Equivalent to just simply finding the minimum - for n=100; p=1000; and q={2, 10}
+    // let mean_error_per_rep_across_folds = performances
+    //     .mean_axis(Axis(0))
+    //     .unwrap()
+    //     .mean_axis(Axis(0))
+    //     .unwrap();
+    // let min_error = mean_error_per_rep_across_folds.view().min();
+    // let ((i, j), _) = mean_error_per_rep_across_folds
+    //             .indexed_iter()
+    //             .find(|((_i, _j), &x)| x == min_error)
+    //             .unwrap();
+    // let alpha = alpha_path[(i,j)];
+    // let lambda = lambda_path[(i,j)];
+    // ///////////////////////////////////
     let b_hat: Array1<f64> = ols(x, y, row_idx, &(0..x.ncols()).collect::<Vec<usize>>()).unwrap();
     let b_hat_penalised: Array1<f64> = expand_and_contract(&b_hat, alpha, lambda).unwrap();
     Ok((b_hat_penalised, alpha, lambda))
@@ -354,5 +354,6 @@ mod tests {
         assert_eq!(idx.iter().fold(0, |sum, &x| sum + x), s);
         assert_eq!(k, 2);
         assert_eq!(s, 5);
+        // assert_eq!(0, 1);
     }
 }
